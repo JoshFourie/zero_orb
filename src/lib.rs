@@ -12,6 +12,7 @@ pub struct InboundData {
     sleep: usize,
     mindulfness: usize,
     calories: usize,
+    tag: Vec<u8>,
 }
 
 pub struct CommonReference {
