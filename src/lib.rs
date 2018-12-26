@@ -7,6 +7,13 @@ use serde_json::{to_string, from_str};
 pub use zksnark::*;
 pub use zksnark::field::z251::Z251;
 
+pub struct InboundData {
+    steps: usize,
+    sleep: usize,
+    mindulfness: usize,
+    calories: usize,
+}
+
 pub struct CommonReference {
     pub code: Vec<u8>,
     pub qap: QAP<CoefficientPoly<Z251>>,
