@@ -2,21 +2,21 @@ use std::fs::File;
 use std::io::{LineWriter, Write};
 use std::path::Path;
 
-pub fn build_comparator(quantity: usize, path: &Path) {
+pub fn build(quantity: usize, path: &Path) {
     let file = File::create(path).unwrap();
     let mut file = LineWriter::new(file);
     let quantity = quantity;
-    initialise_zk(
+    insert_res(
         quantity,
-        insert_diff(
+        insert_chka(
             quantity,
-            insert_acc(
+            insert_fdiff(
                 quantity,
-                insert_fdiff(
+                insert_acc(
                     quantity,
-                    insert_acc(
+                    insert_diff(
                         quantity,
-                        insert_res(
+                        initialise_zk(
                             quantity,
                             &mut file
                         )
