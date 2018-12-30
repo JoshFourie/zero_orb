@@ -5,6 +5,10 @@ authors = ["JoshFourie <josh@omniaprotocol.com>"]
 edition = "2018"
 
 [dependencies]
-zksnark = { git = "https://github.com/JoshFourie/zksnark-rs.git"}
+zksnark = {git = "https://github.com/JoshFourie/zksnark-rs.git"}
 itertools = "0.6.0"
 serde_json  = "1.0"
+serde_derive = "1.0"
+serde = "1.0"
+rand = "^0.3.14"
+num = "0.2.0"

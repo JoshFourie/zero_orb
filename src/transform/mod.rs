@@ -1,123 +1,57 @@
 use itertools::Itertools;
-use zksnark::field::z251::Z251;
+use num::{PrimInt, NumCast};
+use zksnark::field::Field;
 
-pub trait IntoNumField {
+pub trait IntoNumField<F> {
     type Field;
-    fn collect_num_field(self) -> Result<Self::Field, ()>;
+    fn collect_num_field(self) -> Self::Field;
 }
 
-impl IntoNumField for Vec<u32> {
-    type Field = Vec<Z251>;
-    fn collect_num_field(self) -> Result<Self::Field, ()> {
-        Ok(self.into_iter()
-            .map(|num: u32| Z251::from(num as usize))
-            .collect::<Vec<_>>()
-        )
+impl<U, F> IntoNumField<F> for Vec<U> 
+where 
+    U: PrimInt, 
+    F: Field + From<U>
+{
+    type Field = Vec<F>;
+    fn collect_num_field(self) -> Self::Field {
+        self.into_iter()
+            .map(|num| {
+                let f: F = num.into(); 
+                f
+            }
+        ).collect::<Vec<_>>()
     }
 }
 
-impl IntoNumField for Vec<u8> {
-    type Field = Vec<Z251>;
-    fn collect_num_field(self) -> Result<Self::Field, ()> {
-        Ok(self.into_iter()
-            .map(|num: u8| Z251::from(num as usize))
-            .collect::<Vec<_>>()
-        )
-    }
-}
-
-impl IntoNumField for Option<Vec<u8>> {
-    type Field = Vec<Z251>;
-    fn collect_num_field(self) -> Result<Self::Field, ()> {
-        match self {
-            Some(x) => {
-                return Ok(
-                    x.into_iter()
-                        .map(|num: u8| Z251::from(num as usize))
-                        .collect::<Vec<_>>()
-                )
-            },
-            None => Err(()),
-        }
-    }
-}
-
-pub trait IntoBitsField {
+pub trait IntoBitsField<F> {
     type Field;
-    fn collect_bit_field(self) -> Result<Self::Field, ()>;
+    fn collect_bit_field(self) -> Self::Field;
 } 
 
-impl IntoBitsField for Vec<u8> {
-    type Field = Vec<Z251>;
-    fn collect_bit_field(self) -> Result<Self::Field, ()> {
-        let bit_array = self.into_iter().map(|mut num| {
-            let mut bits: [u8; 8] = [0; 8];
-            for i in 0..8 {
-                bits[i] = num % 2;
-                num = num >> 1;
-            }
-            bits
-        }).collect::<Vec<_>>();
-        Ok(
-            bit_array.into_iter()
-                .map(|a| {
-                a.iter().map(|&n| {
-                    assert!(n < 251);
-                    Z251 { inner: (n) as u8 }
-                }).collect::<Vec<_>>()        
-            }).concat()
-        )
-    }
-}
-
-impl IntoBitsField for Option<Vec<u8>> {
-    type Field = Vec<Z251>;
-    fn collect_bit_field(self) -> Result<Self::Field, ()> {
-        match self {
-            Some(x) => {
-                let bit_array = x.into_iter()
-                    .map(|mut num| {
-                        let mut bits: [u8; 8] = [0; 8];
-                        for i in 0..8 {
-                            bits[i] = num % 2;
-                            num = num >> 1;
-                        }
-                        bits
-                    }).collect::<Vec<_>>();
-                return Ok(
-                    bit_array.into_iter()
-                        .map(|a| {
-                        a.iter().map(|&n| {
-                            assert!(n < 251);
-                            Z251 { inner: (n) as u8 }
-                        }).collect::<Vec<_>>()        
-                    }).concat()
-                )
-            },
-            None => Err(())
-        }
-    }
-}
-
-impl IntoBitsField for Vec<u32> {
-        type Field = Vec<Z251>;
-        fn collect_bit_field(self) -> Result<Self::Field, ()> {
-            let bit_array = self.into_iter().map(|mut num| {
-                let mut bits: [u32; 32] = [0; 32];
-                for i in 0..32 {
-                    bits[i] = num % 2;
-                    num = num >> 1;
+impl<K, F> IntoBitsField<F> for Vec<K> 
+where 
+    K: PrimInt,
+    F: Field + From<K>
+{
+        type Field = Vec<F>;
+        fn collect_bit_field(self) -> Self::Field {
+            let bit_array = self.into_iter()
+                .map(|mut num| {
+                    let mut bits = [K::zero(); 16];
+                    for i in 0..16 {
+                        bits[i] = num % NumCast::from(2).unwrap();
+                        num = num >> 1;
+                    }
+                    bits
                 }
-                bits
-            }).collect::<Vec<_>>();
-            Ok(
-                bit_array.into_iter()
-                    .map(|a| {
-                    a.iter().map(|&n| {
-                        assert!(n < 251);
-                        Z251 { inner: (n) as u8 }
-                    }).collect::<Vec<_>>()        
-                }).concat()
-            )
+            ).collect::<Vec<_>>();
+            bit_array.into_iter()
+                .map(|x| {
+                x.iter().map(|&num| {
+                    assert!(num < NumCast::from(30000).unwrap());
+                    let f: F = num.into();
+                    f
+                }).collect::<Vec<F>>()        
+            }).concat()
         }
     }
