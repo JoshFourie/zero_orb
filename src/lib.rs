@@ -1,3 +1,4 @@
+#![feature(type_ascription)]
 pub mod transform;
 pub mod code_gen;
 pub mod field;

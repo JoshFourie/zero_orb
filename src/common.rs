@@ -38,12 +38,12 @@ where
     + Random,
 {
     fn read<'de, P: AsRef<Path>>(paths: PathFinder<P>) -> Self {
-        let code = read_to_string(paths.code).unwrap();
+        let code = read_to_string(paths.code).expect("read_to_string for code on CommonReference");
         let qap: QAP<CoefficientPoly<F>> = WrappedQAP::from(
             WrappedDummyRep(
                 ASTParser::try_parse(
                     &code
-                ).unwrap()
+                ).expect("ASTParser::try_parse into WrappedDummyRep")
             )
         ).0;
         let (sg1, sg2) = zksnark::groth16::setup(&qap);

@@ -71,12 +71,12 @@ impl Field for Z655 {
     }
 }
 
-impl From<usize> for Z655 {
-    fn from(n: usize) -> Self {
-        assert!(n < 65535);
-        Z655 { inner: (n) as u16 }
+impl<I: num::PrimInt> From<I> for Z655 {
+    fn from(n: I) -> Self {
+        use num::NumCast;
+        Z655 { inner: NumCast::from(n).expect("NumCast::from(n) for Z655::from<PrimInt>")}
     }
-}
+} 
 
 impl Into<usize> for Z655 {
     fn into(self) -> usize {
