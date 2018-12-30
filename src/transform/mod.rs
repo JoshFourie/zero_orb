@@ -2,56 +2,54 @@ use itertools::Itertools;
 use num::{PrimInt, NumCast};
 use zksnark::field::Field;
 
-pub trait IntoNumField<F> {
-    type Field;
-    fn collect_num_field(self) -> Self::Field;
+pub trait IntoField<S> {
+    fn collect_nums<T>(self) -> Vec<T>
+    where
+        T: Field + From<S>;
+    fn collect_bits<U>(self) -> Vec<U>
+    where
+        U: Field + From<S>;
 }
 
-impl<U, F> IntoNumField<F> for Vec<U> 
-where 
-    U: PrimInt, 
-    F: Field + From<U>
-{
-    type Field = Vec<F>;
-    fn collect_num_field(self) -> Self::Field {
+// expand somehow for differing [] based on type.
+impl<S: PrimInt> IntoField<S> for Vec<S> {
+    fn collect_nums<T>(self) -> Vec<T>
+    where
+        T: Field + From<S>,
+    {
         self.into_iter()
-            .map(|num| {
-                let f: F = num.into(); 
-                f
-            }
-        ).collect::<Vec<_>>()
+            .map(|n| {
+                let x: T = n.into();
+                x
+            }).collect::<Vec<T>>()
+    }
+    fn collect_bits<U>(self) -> Vec<U> 
+    where
+        U: Field + From<S>,
+    {
+        let x = self.into_iter()
+            .map(|mut n| {
+                let mut lim = 0;
+                match n {
+                    u8 => lim = 8,
+                    u16 => lim = 16,
+                    u32 => lim = 32,
+                    u64 => lim = 64,
+                    _ => panic!(),
+                };
+                let mut bits = [S::zero()];
+                for i in 0..lim {
+                    bits[i] = n % NumCast::from(2).unwrap();
+                    n = n >> 1;
+                };
+                bits
+            }).collect::<Vec<_>>();
+        x.into_iter().map(|y| {
+            y.into_iter().map(|&n| {
+                assert!(n < NumCast::from(30000).unwrap());
+                let z: U = n.into();
+                z
+            }).collect::<Vec<U>>()
+        }).concat()
     }
 }
-
-pub trait IntoBitsField<F> {
-    type Field;
-    fn collect_bit_field(self) -> Self::Field;
-} 
-
-impl<K, F> IntoBitsField<F> for Vec<K> 
-where 
-    K: PrimInt,
-    F: Field + From<K>
-{
-        type Field = Vec<F>;
-        fn collect_bit_field(self) -> Self::Field {
-            let bit_array = self.into_iter()
-                .map(|mut num| {
-                    let mut bits = [K::zero(); 16];
-                    for i in 0..16 {
-                        bits[i] = num % NumCast::from(2).unwrap();
-                        num = num >> 1;
-                    }
-                    bits
-                }
-            ).collect::<Vec<_>>();
-            bit_array.into_iter()
-                .map(|x| {
-                x.iter().map(|&num| {
-                    assert!(num < NumCast::from(30000).unwrap());
-                    let f: F = num.into();
-                    f
-                }).collect::<Vec<F>>()        
-            }).concat()
-        }
-    }

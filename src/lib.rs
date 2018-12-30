@@ -4,8 +4,6 @@ pub mod field;
 pub mod knowledge;
 pub mod common;
 
-use serde::{Serialize, Deserialize};
-
 pub use zksnark::*;
 pub use zksnark::field::Field;
 pub use num;
