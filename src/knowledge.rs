@@ -1,65 +1,75 @@
 use crate::{
-    common::{PathFinder, CommonReference, Commoner},
+    common::{PathFinder, CommonReference},
     transform::IntoField,
 };
 use zksnark::{
+    QAP,
+    SigmaG1,
+    SigmaG2,
     Proof,
     CoefficientPoly,
-    field::Field,
+    field::{Polynomial, Field},
     groth16,
     groth16::EllipticEncryptable
 };
 use std::{
     path::Path,
     str::FromStr,
-    ops::{Add, Sub},
+    ops::{Add, Sub, Mul, Div},
     iter::Sum,
 };
-use num::PrimInt;  
+use num::PrimInt;
+use serde::{Serialize, Deserialize};  
 
 //  MODULE FOR CREATING AND VERIFYING A PROOF.
 
 //  Knowledge struct holds 'witness bits', 'variable bits, 'witness num' and 'variable num' that are parseable values for groth16.
 // K represents any u-value: u8, u16 etc. P is a placeholder for Paths.
+// wb .. vn is constructed like this as the variables should be fed in witness bits -> witness num -> var num -> var bits in the (in of the .zk).
 pub struct Knowledge<K, P> {
     pub wb: Vec<K>,
     pub vb: Vec<K>,
     pub wn: Vec<K>,
     pub vn: Vec<K>,
-    pub t: Vec<u8>,
+    pub ut: &'static str,
     pub pth: PathFinder<P>,
 }
 
 // impl to derive the 'new' and function for the Knowledge struct which builds a Proof object.
 // Knowledge can hold any u value provided it is consistent through the struct.
 // K --> u16 etc which are all PrimInts from the Num crate, P is a Path. 
-impl<K: PrimInt, P: AsRef<Path>> Knowledge<K, P>
+impl<K: PrimInt + 'static, P: AsRef<Path> + Clone> Knowledge<K, P>
 {
     // builds a proof from the provided values using .zk program pulled from the Paths.
     // takes T: any field e.g. Z655, Z251 etc. , V: SigmaG1<FIELD> type, W: SigmaG2<FIELD> type.
     // returns the groth16::Proof struct which takes G1 and G2 as type arguments.
     pub fn new<T, V, W>(self) -> Proof<V, W>
     where 
-        T: EllipticEncryptable<G1 = V, G2 = W>
+        for <'de> T: EllipticEncryptable<G1 = V, G2 = W>
             + Field
             + From<usize>
             + FromStr
             + groth16::Random
-            + From<K>,
-        V: Add<Output=V> + Sub<Output=V> + Sum + Copy,
-        W: Add<Output=W> + Sum + Copy,
+            + From<K>
+            + Serialize 
+            + Deserialize<'de>,
+        for <'de> V: Add<Output=V> + Sub<Output=V> + Sum + Copy + Serialize + Deserialize<'de>,
+        for <'de> W: Add<Output=W> + Sum + Copy + Serialize + Deserialize<'de>,
     {
         // crs holds a struct that reads the stored QAP, Code and G1, G2 values from file.
-        let crs: CommonReference<T> = CommonReference::read(self.pth);
+        // TODO: impl response for where read fails because file does not exist or is corrupted.
+        let crs: CommonReference<T, V, W> = CommonReference::read(self.pth);
         
         // asssignments holds a vec of fields that can be parsed by the groth16 weights argument.
+        // appends witness bits/nums and variable bits/nums only where values are present in the Knowledge struct.
+        // TODO: replace Vec::new() with alternative to reduce load on heap-mem.
         // See Transform mod for methods
         let mut assignments = Vec::new();
-        match self.wb.collect_bits() {
+        match self.wb.collect_bits(self.ut) {
             Some(mut x) => assignments.append(&mut x),
             _ => {},
         };
-        match self.vb.collect_bits() {
+        match self.vb.collect_bits(self.ut) {
             Some(mut x) => assignments.append(&mut x),
             _ => {},
         };
@@ -71,6 +81,7 @@ impl<K: PrimInt, P: AsRef<Path>> Knowledge<K, P>
             Some(mut x) => assignments.append(&mut x),
             _ => {}
         };
+
         // generates the 'weights' for the zkSNARK.
         let weights = groth16::weights(
             std::str::from_utf8(
@@ -80,10 +91,11 @@ impl<K: PrimInt, P: AsRef<Path>> Knowledge<K, P>
         ).expect("groth16::weights");    
 
         // builds the proof returned from the function.
-        groth16::prove(
+        // T = field e.g FrLocal, V = G1 e.g. G1Local or Z251 as EllipticEncryptable, W = G2 e.g. G2Local or Z251 as EllipticEncryptable.
+        groth16::prove::<CoefficientPoly<T>, T, V, W>(
             &crs.qap,
             (&crs.sg1, &crs.sg2),
-            weights.as_slice()
+            &weights
         )
     }
 }
@@ -92,37 +104,42 @@ impl<K: PrimInt, P: AsRef<Path>> Knowledge<K, P>
 pub struct Marker<L, P> {
     pub vn: Vec<L>,
     pub vb: Vec<L>,
+    pub ut: &'static str,
     pub pth: PathFinder<P>,
 }
 
 // impl for the 'check' which is just a verification of a proof that can be called by the prover/verifier.
 // takes L: PrimInt --> u16, u8 etc... for the ^^^ verification values, P for the crs struct.
-impl<L: PrimInt, P: AsRef<Path>> Marker<L, P> 
+impl<L: PrimInt + 'static, P: AsRef<Path> + Clone> Marker<L, P> 
 {
     // check takes R == G1, S == G2, T == GT, U == field e.g. Z655, Z251 etc...
     // returns bool whether proof is correct. 
-    pub fn check<R, S, T, U>(self, prf: Proof<R,S>) -> bool 
+    pub fn check<U, R, S, T>(self, prf: Proof<R,S>) -> bool 
     where
-        U: EllipticEncryptable<G1 = R, G2 = S, GT = T>
+        for <'de> U: EllipticEncryptable<G1 = R, G2 = S, GT = T>
             + Field
             + From<usize>
             + FromStr
             + groth16::Random
-            + From<L>,
-        R: Add<Output=R> + Sub<Output=R> + Sum + Copy,
-        S: Add<Output=S> + Sum + Copy,
-        T: Add<Output=T> + PartialEq,
+            + From<L>
+            + Serialize 
+            + Deserialize<'de>,
+        for <'de> R: Add<Output=R> + Sub<Output=R> + Sum + Copy + Serialize + Deserialize<'de>,
+        for <'de> S: Add<Output=S> + Sum + Copy + Serialize + Deserialize<'de>,
+        for <'de> T: Add<Output=T> + PartialEq + Serialize + Deserialize<'de>,
     {
-        // crs generator...
-        let crs: CommonReference<U> = CommonReference::read(self.pth);
+        // reading the CRS from file.
+        // This MUST be IDENTICAL to the CRS used in the Knowledge::new() method.
+        let crs: CommonReference<U, R, S> = CommonReference::read(self.pth);
 
-        // stores verification values as fields that are parseable with groth16::verify. See Transform mod for methods.
+        // stores verification values as fields that are parseable with groth16::verify. 
+        // See Transform mod for methods.
         let mut inputs: Vec<U> = Vec::new();
         match self.vn.collect_nums() {
             Some(mut x) => inputs.append(&mut x),
             _ => {}
         };
-        match self.vb.collect_bits() {
+        match self.vb.collect_bits(self.ut) {
             Some(mut x) => inputs.append(&mut x),
             _ => {}
         };
@@ -134,4 +151,59 @@ impl<L: PrimInt, P: AsRef<Path>> Marker<L, P>
             prf
         )
     }
+}
+
+#[test]
+fn test_simple_num() {
+    use zksnark::groth16::fr::{FrLocal, G1Local, G2Local, GtLocal};
+    // x = abc + d + e where a = wn, b = wn, c = vn, d = vn and e = vn
+    // verify 18 = (9) (2)
+    // enclosure for convenience to build a proof.
+    let gen = |a, b: usize| -> Proof<G1Local, G2Local> {
+        let k = Knowledge::<usize, &Path> {
+            wb: Vec::new(),
+            wn: vec![a, b],
+            vn: Vec::new(),
+            vb: Vec::new(),
+            ut: "",
+            pth: PathFinder::<&Path> {
+                code: Path::new("src/tests/files/common/simple.zk"),
+                qap: Path::new("src/tests/files/common/knowledge_tests/simple.qap"),
+                sg1: Path::new("src/tests/files/common/knowledge_tests/simple.sg1"),
+                sg2: Path::new("src/tests/files/common/knowledge_tests/simple.sg2"),
+            },
+        };
+        k.new::<FrLocal, G1Local, G2Local>()
+    };
+    //  enclosure for convenience for checking a proof.
+    let check = |a: usize, k: Proof<G1Local, G2Local>| -> bool {
+        let m = Marker::<usize, &Path> {
+            vb: Vec::new(),
+            vn: vec![a],
+            ut: "",
+            pth: PathFinder::<&Path> {
+                code: Path::new("src/tests/files/common/simple.zk"),
+                qap: Path::new("src/tests/files/common/knowledge_tests/simple.qap"),
+                sg1: Path::new("src/tests/files/common/knowledge_tests/simple.sg1"),
+                sg2: Path::new("src/tests/files/common/knowledge_tests/simple.sg2"),
+            },
+        };
+        m.check::<FrLocal, G1Local, G2Local, GtLocal>(k)
+    };
+    // 3 x 2 = 6.
+    assert_eq!(
+        true,
+        check(6, gen(3, 2))
+    );  
+    // 3 x 2 != 7.
+    assert_eq!(
+        false,
+        check(7, gen(3, 2))
+    );    
+    // 1 x 2 != 2.
+    assert_eq!(
+        false,
+        check(6, gen(1, 2))
+    );      
+
 }

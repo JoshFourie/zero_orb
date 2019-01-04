@@ -2,14 +2,18 @@ use std::fs::File;
 use std::io::{LineWriter, Write};
 use std::path::Path;
 
+// generates a new file containing a comparator.
+// tag is used to identify the bits we desire, RANGE generates an a < b < c and COMP produces a < b
 pub fn new(tag: &'static str, path: &Path) {
     let file = LineWriter::new(
         File::create(path).unwrap()
     );
     match tag {
+        "64 RANGE" => build(3, 64, file),
         "32 RANGE" => build(3, 32, file),
         "16 RANGE" => build(3, 16, file),
         "8 RANGE" => build(3, 8, file),
+        "64 COMP" => build(3, 64, file),
         "32 COMP" => build(2, 32, file),
         "16 COMP" => build(2, 16, file),
         "8 COMP" => build(2, 8, file),

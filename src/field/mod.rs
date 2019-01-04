@@ -10,7 +10,9 @@ use std::{
     };
 use serde_derive::{Serialize, Deserialize};
 
-pub mod z655;
+// zksnark-rs does not permit QAP generation generically from a custom field.
+// the WrappedDumyRep and WrappedQAP newtypes permit generic conversion.
+// note that z655 is currently deprecated in favour of FrLocal.
 
 #[derive(Serialize, Deserialize)]
 pub struct WrappedDummyRep<F>(pub DummyRep<F>);
@@ -185,6 +187,7 @@ where
     }
 }
 
+// used for division impl on custom fields such as Z655.
 fn ext_euc_alg<T>(a: T, b: T) -> (T, T, T)
 where
     T: Div<Output = T> + Mul<Output = T> + Sub<Output = T> + Eq + FieldIdentity + Copy,

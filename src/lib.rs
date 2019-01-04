@@ -6,15 +6,8 @@ pub mod knowledge;
 pub mod common;
 
 pub use zksnark::*;
-pub use zksnark::field::Field;
+pub use zksnark::field::z251::Z251;
 pub use num;
 
-pub struct InboundData {
-    steps: usize,
-    sleep: usize,
-    mindulfness: usize,
-    calories: usize,
-    tag: Vec<u8>,
-}
-
-
+// Notes:
+// Knowledge: init the struct with empty vecs appears wasteful as it incurs additinoal heap allocation, potentially find alternate solution.

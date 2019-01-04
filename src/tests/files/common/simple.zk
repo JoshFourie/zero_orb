@@ -1,0 +1,6 @@
+(in a b)
+(out x)
+(verify x)
+
+(program
+    (= x (* a b)))

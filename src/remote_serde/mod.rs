@@ -1,6 +1,8 @@
 use zksnark::groth16::QAP;
 use serde::{Serialize, Deserialize};
 
+// in progress module to remove reliance on local fork of zksnark-rs and bn-crate.
+
 #[serde(remote = "QAP")]
 pub struct QAPDef<P> {
     #[serde(getter = "QAP::CoefficientPoly<Z251>")]
