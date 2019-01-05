@@ -8,7 +8,6 @@ use zksnark::{
         circuit::{ASTParser, TryParse}
     },        
 };
-use crate::field::{WrappedQAP, WrappedDummyRep};
 use std::{
     str::FromStr, 
     fs::{read_to_string, File},
@@ -19,6 +18,7 @@ use std::{
 };
 use serde::{Serialize, Deserialize};
 use serde_json::to_string;
+use crate::transform::wrapped_groth::{WrappedQAP, WrappedDummyRep};
 
 // Struct to access the code, QAP, SigmaG1 and SigmaG2 values.
 // F => a field, G => G1, H => G2.
@@ -110,6 +110,16 @@ where
                 to_string(&self.sg2).expect("CommonReference::write() parsing SigmaG2 as string for writing").as_bytes()
             );
     }
+
+    // used to derive a CommonReference struct without reading from file or generating new values.
+    pub fn init(c: Vec<u8>, q: QAP<CoefficientPoly<F>>, g1: SigmaG1<G>, g2: SigmaG2<H>) -> Self{
+        Self {
+            code: c,
+            qap: q,
+            sg1: g1,
+            sg2: g2,
+        }  
+    }
 }
 
 #[test]
@@ -146,15 +156,15 @@ fn test_read_reference() {
         true => {},
         false => panic!("CommonReference: crs.code != code"),
     };
-    match crs.qap == qap {
+    match to_string(&crs.qap).unwrap() == to_string(&qap).unwrap() {
         true => {},
         false => panic!("CommonReference: crs.qap != qap"),
     };
-    match crs.sg1 == sg1 {
+    match to_string(&crs.sg1).unwrap() == to_string(&sg1).unwrap() {
         true => {},
         false => panic!("CommonReference: crs.sg1 != sg1"),
     }; 
-    match crs.sg2 == sg2 {
+    match to_string(&crs.sg2).unwrap() == to_string(&sg2).unwrap() {
         true => {},
         false => panic!("CommonReference: crs.sg2 != sg2"),
     };

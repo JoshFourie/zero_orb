@@ -1,21 +1,18 @@
 use crate::{
     common::{PathFinder, CommonReference},
-    transform::IntoField,
+    transform::into_field::IntoField,
 };
 use zksnark::{
-    QAP,
-    SigmaG1,
-    SigmaG2,
     Proof,
     CoefficientPoly,
-    field::{Polynomial, Field},
+    field::Field,
     groth16,
     groth16::EllipticEncryptable
 };
 use std::{
     path::Path,
     str::FromStr,
-    ops::{Add, Sub, Mul, Div},
+    ops::{Add, Sub},
     iter::Sum,
 };
 use num::PrimInt;
@@ -26,25 +23,27 @@ use serde::{Serialize, Deserialize};
 //  Knowledge struct holds 'witness bits', 'variable bits, 'witness num' and 'variable num' that are parseable values for groth16.
 // K represents any u-value: u8, u16 etc. P is a placeholder for Paths.
 // wb .. vn is constructed like this as the variables should be fed in witness bits -> witness num -> var num -> var bits in the (in of the .zk).
-pub struct Knowledge<K, P> {
+pub struct Knowledge<K> {
     pub wb: Vec<K>,
     pub vb: Vec<K>,
     pub wn: Vec<K>,
     pub vn: Vec<K>,
     pub ut: &'static str,
-    pub pth: PathFinder<P>,
 }
 
 // impl to derive the 'new' and function for the Knowledge struct which builds a Proof object.
 // Knowledge can hold any u value provided it is consistent through the struct.
 // K --> u16 etc which are all PrimInts from the Num crate, P is a Path. 
-impl<K: PrimInt + 'static, P: AsRef<Path> + Clone> Knowledge<K, P>
+impl<K> Knowledge<K>
+where
+    K: PrimInt + 'static,
 {
     // builds a proof from the provided values using .zk program pulled from the Paths.
     // takes T: any field e.g. Z655, Z251 etc. , V: SigmaG1<FIELD> type, W: SigmaG2<FIELD> type.
     // returns the groth16::Proof struct which takes G1 and G2 as type arguments.
-    pub fn new<T, V, W>(self) -> Proof<V, W>
-    where 
+    pub fn new<P, T, V, W>(self, crs: CommonReference<T, V, W>) -> Proof<V, W> 
+    where
+        P: AsRef<Path>,
         for <'de> T: EllipticEncryptable<G1 = V, G2 = W>
             + Field
             + From<usize>
@@ -55,11 +54,7 @@ impl<K: PrimInt + 'static, P: AsRef<Path> + Clone> Knowledge<K, P>
             + Deserialize<'de>,
         for <'de> V: Add<Output=V> + Sub<Output=V> + Sum + Copy + Serialize + Deserialize<'de>,
         for <'de> W: Add<Output=W> + Sum + Copy + Serialize + Deserialize<'de>,
-    {
-        // crs holds a struct that reads the stored QAP, Code and G1, G2 values from file.
-        // TODO: impl response for where read fails because file does not exist or is corrupted.
-        let crs: CommonReference<T, V, W> = CommonReference::read(self.pth);
-        
+    {    
         // asssignments holds a vec of fields that can be parsed by the groth16 weights argument.
         // appends witness bits/nums and variable bits/nums only where values are present in the Knowledge struct.
         // TODO: replace Vec::new() with alternative to reduce load on heap-mem.
@@ -97,6 +92,24 @@ impl<K: PrimInt + 'static, P: AsRef<Path> + Clone> Knowledge<K, P>
             (&crs.sg1, &crs.sg2),
             &weights
         )
+    }
+
+    pub fn new_from_file<P, T, V, W>(self, pth: PathFinder<P>) -> Proof<V, W>
+    where
+        P: AsRef<Path>,
+        for <'de> T: EllipticEncryptable<G1 = V, G2 = W>
+            + Field
+            + From<usize>
+            + FromStr
+            + groth16::Random
+            + From<K>
+            + Serialize 
+            + Deserialize<'de>,
+        for <'de> V: Add<Output=V> + Sub<Output=V> + Sum + Copy + Serialize + Deserialize<'de>,
+        for <'de> W: Add<Output=W> + Sum + Copy + Serialize + Deserialize<'de>,
+    { 
+        let crs: CommonReference<T, V, W> = CommonReference::read(pth);
+        Self::new::<P, T, V, W>(self, crs)
     }
 }
 
@@ -160,20 +173,20 @@ fn test_simple_num() {
     // verify 18 = (9) (2)
     // enclosure for convenience to build a proof.
     let gen = |a, b: usize| -> Proof<G1Local, G2Local> {
-        let k = Knowledge::<usize, &Path> {
+        let k = Knowledge::<usize> {
             wb: Vec::new(),
             wn: vec![a, b],
             vn: Vec::new(),
             vb: Vec::new(),
             ut: "",
-            pth: PathFinder::<&Path> {
-                code: Path::new("src/tests/files/common/simple.zk"),
-                qap: Path::new("src/tests/files/common/knowledge_tests/simple.qap"),
-                sg1: Path::new("src/tests/files/common/knowledge_tests/simple.sg1"),
-                sg2: Path::new("src/tests/files/common/knowledge_tests/simple.sg2"),
-            },
         };
-        k.new::<FrLocal, G1Local, G2Local>()
+        let p = PathFinder::<&Path> {
+            code: Path::new("src/tests/files/simple.zk"),
+            qap: Path::new("src/tests/files/knowledge/simple.qap"),
+            sg1: Path::new("src/tests/files/knowledge/simple.sg1"),
+            sg2: Path::new("src/tests/files/knowledge/simple.sg2"),
+        };
+        k.new_from_file::<&Path, FrLocal, G1Local, G2Local>(p)
     };
     //  enclosure for convenience for checking a proof.
     let check = |a: usize, k: Proof<G1Local, G2Local>| -> bool {
@@ -182,10 +195,10 @@ fn test_simple_num() {
             vn: vec![a],
             ut: "",
             pth: PathFinder::<&Path> {
-                code: Path::new("src/tests/files/common/simple.zk"),
-                qap: Path::new("src/tests/files/common/knowledge_tests/simple.qap"),
-                sg1: Path::new("src/tests/files/common/knowledge_tests/simple.sg1"),
-                sg2: Path::new("src/tests/files/common/knowledge_tests/simple.sg2"),
+                code: Path::new("src/tests/files/simple.zk"),
+                qap: Path::new("src/tests/files/knowledge/simple.qap"),
+                sg1: Path::new("src/tests/files/knowledge/simple.sg1"),
+                sg2: Path::new("src/tests/files/knowledge/simple.sg2"),
             },
         };
         m.check::<FrLocal, G1Local, G2Local, GtLocal>(k)

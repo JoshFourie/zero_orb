@@ -1,13 +1,10 @@
-use zksnark::field::{Polynomial, Field, FieldIdentity};
+use zksnark::field::{Polynomial, Field};
 use zksnark::groth16::{
-    QAP, Random, Identity, EllipticEncryptable,
+    QAP, 
     coefficient_poly::{CoefficientPoly, root_poly},
     circuit::{RootRepresentation, dummy_rep::DummyRep}
 };
-use zksnark::encryption::{Encryptable, EncryptProperties};
-use std::{
-    iter::Sum, str::FromStr, ops::{Div, Mul, Sub, Neg, Add}, vec::IntoIter
-    };
+use std::vec::IntoIter;
 use serde_derive::{Serialize, Deserialize};
 
 // zksnark-rs does not permit QAP generation generically from a custom field.
@@ -185,32 +182,4 @@ where
             }
         )
     }
-}
-
-// used for division impl on custom fields such as Z655.
-fn ext_euc_alg<T>(a: T, b: T) -> (T, T, T)
-where
-    T: Div<Output = T> + Mul<Output = T> + Sub<Output = T> + Eq + FieldIdentity + Copy,
-{
-    let (ref mut r0, ref mut r1) = (a, b);
-    let (ref mut s0, ref mut s1) = (T::one(), T::zero());
-    let (ref mut t0, ref mut t1) = (T::zero(), T::one());
-
-    let (mut r, mut s, mut t, mut q): (T, T, T, T);
-
-    while *r1 != T::zero() {
-        q = *r0 / *r1;
-        r = *r0 - q * (*r1);
-        s = *s0 - q * (*s1);
-        t = *t0 - q * (*t1);
-
-        *r0 = *r1;
-        *r1 = r;
-        *s0 = *s1;
-        *s1 = s;
-        *t0 = *t1;
-        *t1 = t;
-    }
-
-    (*r0, *s0, *t0)
 }
