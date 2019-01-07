@@ -7,7 +7,7 @@ pub trait IntoField<S> {
     fn collect_nums<T>(self) -> Option<Vec<T>>
     where 
         T: Field + From<S>;
-    fn collect_bits<U>(self, t: &'static str) -> Option<Vec<U>>
+    fn collect_bits<U>(self, t: &String) -> Option<Vec<U>>
     where
         U: Field + From<S>;
 }
@@ -34,7 +34,7 @@ impl<S: PrimInt> IntoField<S> for Vec<S> {
             )
         }
     }
-    fn collect_bits<U>(self, t: &'static str) -> Option<Vec<U>> 
+    fn collect_bits<U>(self, t: &String) -> Option<Vec<U>> 
     where
         U: Field + From<S>,
     {
@@ -45,7 +45,7 @@ impl<S: PrimInt> IntoField<S> for Vec<S> {
                 .map(|mut n| {
                     let mut bits: Vec<S> = Vec::new(); 
                     let len: usize;
-                    match t {
+                    match t.as_ref() {
                         "u8" => { 
                             bits.extend_from_slice(&[S::zero(); 8]); 
                             len = 8; 
@@ -62,7 +62,7 @@ impl<S: PrimInt> IntoField<S> for Vec<S> {
                             bits.extend_from_slice(&[S::zero(); 64]); 
                             len = 64; 
                         },
-                        _ => panic!("unexpected &'static str in IntoField::collect_bits()"),
+                        _ => panic!("unexpected String in t.as_ref() IntoField::collect_bits()"),
                     };
                     for i in 0..len {
                         bits[i] = n % NumCast::from(2).expect("NumCast::from(2) in IntoField::collect_bits()");

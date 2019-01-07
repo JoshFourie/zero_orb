@@ -1,9 +1,10 @@
 #![feature(type_ascription)]
+
 pub mod transform;
 pub mod code;
 pub mod knowledge;
 pub mod common;
-pub mod crypto;
+pub mod interface;
 
 pub use zksnark::*;
 pub use zksnark::groth16::fr::FrLocal;

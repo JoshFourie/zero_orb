@@ -63,7 +63,7 @@ fn test_collect_bits() {
 
     // expected results are that x_ == y_. and that on a vec len == 0 the fn returns a None.
     let x_none: Vec<usize> = Vec::new();
-    assert!(to_string(&x_none.collect_bits::<FrLocal>("")).unwrap().contains("null")); 
+    assert!(to_string(&x_none.collect_bits::<FrLocal>(&"".to_string())).unwrap().contains("null")); 
     
     let x_8: Vec<usize> = vec![15];
     let y_8: Vec<FrLocal> = vec![
@@ -71,7 +71,7 @@ fn test_collect_bits() {
     ];
     
     assert_eq!(y_8.len(), 8);
-    match x_8.collect_bits::<FrLocal>("u8") {
+    match x_8.collect_bits::<FrLocal>(&"u8".to_string()) {
         Some(val) => {
             match val == y_8 {
                 true => {},
@@ -86,7 +86,7 @@ fn test_collect_bits() {
         FrLocal::from(1), FrLocal::from(0), FrLocal::from(0), FrLocal::from(1), FrLocal::from(0), FrLocal::from(1), FrLocal::from(1), FrLocal::from(1), FrLocal::from(1), FrLocal::from(1), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0),
     ];
     assert_eq!(y_16.len(), 16);
-    match x_16.collect_bits::<FrLocal>("u16") {
+    match x_16.collect_bits::<FrLocal>(&"u16".to_string()) {
         Some(val) => {
             match val == y_16 {
                 true => {},
@@ -101,7 +101,7 @@ fn test_collect_bits() {
         FrLocal::from(0), FrLocal::from(1), FrLocal::from(1), FrLocal::from(1), FrLocal::from(1), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0),
     ];
     assert_eq!(y_32.len(), 32);
-    match x_32.collect_bits::<FrLocal>("u32") {
+    match x_32.collect_bits::<FrLocal>(&"u32".to_string()) {
         Some(val) => {
             match val == y_32 {
                 true => {},
@@ -116,7 +116,7 @@ fn test_collect_bits() {
         FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(1), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0), FrLocal::from(0),
     ];
     assert_eq!(y_64.len(), 64);
-    match x_64.collect_bits::<FrLocal>("u64") {
+    match x_64.collect_bits::<FrLocal>(&"u64".to_string()) {
         Some(val) => {
             match val == y_64 {
                 true => {},
