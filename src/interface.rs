@@ -160,7 +160,7 @@ mod test {
             RefFinder
         },
         knowledge::{Knowledge, Marker, zkVerify},
-        interface::Andromeda,
+        interface::{Andromeda, InterOperable},
     };
 
     fn quick_get_crs() -> CommonReference<FrLocal, G1Local, G2Local> {
