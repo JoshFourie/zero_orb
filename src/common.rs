@@ -23,11 +23,11 @@ use crate::transform::wrapped_groth::{WrappedQAP, WrappedDummyRep};
 // Struct to access the code, QAP, SigmaG1 and SigmaG2 values.
 // F => a field, G => G1, H => G2.
 #[derive(Serialize, Deserialize)]
-pub struct CommonReference<F, G, H> {
+pub struct CommonReference<T, U, V> {
     pub code: String,
-    pub qap: QAP<CoefficientPoly<F>>,
-    pub sg1: SigmaG1<G>,
-    pub sg2: SigmaG2<H>,
+    pub qap: QAP<CoefficientPoly<T>>,
+    pub sg1: SigmaG1<U>,
+    pub sg2: SigmaG2<V>,
 }
 
 // TODO: impl clone trait for RefFinder.
@@ -40,29 +40,44 @@ pub struct RefFinder {
     pub sg2: String,
 }
 
-pub trait Common {
+pub trait Common<T, U, V> {
     fn new(code: String) -> Self;
     fn read(s: &String) -> Self;
+    fn get(self) -> (String, QAP<CoefficientPoly<T>>, SigmaG1<U>, SigmaG2<V>);
 }
 
 // defining the generics per the CommonReference struct.
 // require <'de> lifetime for deserialization.
 // TypeParameters extracted from extern crate zksnark::groth16::mod.rs.
-impl<F, G, H> Common for CommonReference<F, G, H> 
+impl<T, U, V> Common<T, U, V> for CommonReference<T, U, V> 
 where
-    for <'de> F: Field
+    for <'de> 
+    T: EllipticEncryptable<G1 = U, G2 = V> 
+        + Random 
+        + Field 
+        + Copy 
+        + PartialEq
         + From<usize>
         + FromStr
-        + EllipticEncryptable<G1 = G, G2 = H>
-        + Random
-        + Serialize 
+        + Serialize
         + Deserialize<'de>,
-    for <'de> G: Add<Output=G> + Sub<Output=G> + Sum + Copy + Serialize + Deserialize<'de>,
-    for <'de> H: Add<Output=H> + Sum + Copy + Serialize + Deserialize<'de>,
+    for <'de> 
+    U: Add<Output = U> 
+        + Sub<Output = U> 
+        + Sum 
+        + Copy
+        + Serialize
+        + Deserialize<'de>,
+    for <'de> 
+    V: Add<Output = V> 
+        + Sum 
+        + Copy
+        + Serialize
+        + Deserialize<'de>,
 {
     // generates and returns a new CommonReference Struct with new QAP, G1 and G2 values.
     fn new(code: String) -> Self {
-        let qap: QAP<CoefficientPoly<F>> = WrappedQAP::from(
+        let qap: QAP<CoefficientPoly<T>> = WrappedQAP::from(
             WrappedDummyRep(
                 ASTParser::try_parse(
                     &code
@@ -81,24 +96,36 @@ where
     // returns a CommonReference struct from json string.
     fn read(s: &String) -> Self {
         use serde_json::from_str;
-        let crs: CommonReference<F, G, H> = from_str(&s).expect("CommonReference::read() parsing CommonReference struct from String");
+        let crs: CommonReference<T, U, V> = from_str(&s).expect("CommonReference::read() parsing CommonReference struct from String");
         crs    
     }
+    
+    fn get(self) -> (String, QAP<CoefficientPoly<T>>, SigmaG1<U>, SigmaG2<V>) {
+        (self.code, self.qap, self.sg1, self.sg2)
+    }    
+
 }
 
-impl<F, G, H> CommonReference<F, G, H> 
-where
-    F: Field
-        + From<usize>
-        + FromStr
-        + EllipticEncryptable<G1 = G, G2 = H>
-        + Random
+impl<T, U, V> CommonReference<T, U, V>
+where 
+    T: EllipticEncryptable<G1 = U, G2 = V> 
+        + Random 
+        + Field 
+        + Copy 
+        + PartialEq
         + Serialize,
-    G: Add<Output=G> + Sub<Output=G> + Sum + Copy + Serialize,
-    H: Add<Output=H> + Sum + Copy + Serialize,
+    U: Add<Output = U> 
+        + Sub<Output = U> 
+        + Sum 
+        + Copy
+        + Serialize,
+    V: Add<Output = V> 
+        + Sum 
+        + Copy
+        + Serialize,
 {
     // used to derive a CommonReference struct without reading from file or generating new values.
-    pub fn init(c: String, q: QAP<CoefficientPoly<F>>, g1: SigmaG1<G>, g2: SigmaG2<H>) -> Self{
+    pub fn init(c: String, q: QAP<CoefficientPoly<T>>, g1: SigmaG1<U>, g2: SigmaG2<V>) -> Self{
         Self {
             code: c,
             qap: q,
@@ -130,9 +157,12 @@ fn test_read_reference() {
     use zksnark::{groth16, QAP, field::z251::Z251};
     use serde_json::to_string;
     use std::fs::read_to_string;
-
+    use tempfile::tempdir;
     // expected results are that CommonReference::read() will return qap, sg1 and sg2 as before they were written to File.
-    let code = read_to_string("src/tests/files/common/simple.zk").expect("internal test err whilst reading code to string");
+    
+    let code = String::from(
+        "(in a b) (out x) (verify x) (program (= x (* a b)))"
+    );
     let qap: QAP<CoefficientPoly<Z251>> = ASTParser::try_parse(&code).expect("internal test err: ASTParser::try_parse &code unwrapped").into();
     let (sg1, sg2) = groth16::setup(&qap);
     let _crs = CommonReference {

@@ -1,70 +1,74 @@
 use crate::{
-    common::CommonReference,
+    common::Common,
     transform::into_field::IntoField,
 };
 use zksnark::{
-    Proof,
-    CoefficientPoly,
+    Proof, CoefficientPoly,
     field::Field,
     groth16,
-    groth16::EllipticEncryptable
+    groth16::{
+        EllipticEncryptable,
+        Random,
+    },
 };
 use std::{
     str::FromStr,
     ops::{Add, Sub},
     iter::Sum,
 };
-use num::PrimInt;
-use serde::{Serialize, Deserialize};  
 use serde_derive::{Serialize, Deserialize};
 
-//  MODULE FOR CREATING AND VERIFYING A PROOF.
-
-pub trait zkProof<T, V, W> {
-    fn new(self, crs: CommonReference<T, V, W>) -> Proof<V, W>;
+pub trait zkProof {
+    fn new<C, T, U, V>(self, crs: C) -> Proof<U, V> 
+    where
+        C: Common<T, U, V>,
+        T: EllipticEncryptable<G1 = U, G2 = V> 
+            + Random 
+            + Field 
+            + Copy 
+            + PartialEq
+            + From<usize>
+            + FromStr,
+        U: Add<Output=U> + Sub<Output=U> + Sum + Copy,
+        V: Add<Output=V> + Sum + Copy;
 }  
 
-pub trait zkVerify<U, R, S> {
-    fn check(self, crs: CommonReference<U, R, S>, prf: Proof<R, S>) -> bool;
+pub trait zkVerify {
+    fn check<C, T, U, V, W>(self, crs: C, prf: Proof<U, V>) -> bool 
+    where 
+        C: Common<T, U, V>,
+        T: Field 
+            + Copy 
+            + From<usize>
+            + EllipticEncryptable<G1 = U, G2 = V, GT = W>,
+        U: Sum,
+        V: Add<Output=V> + Sum + Copy,
+        W: Add<Output = W> + PartialEq, ;
 }
 
-//  Knowledge struct holds 'witness bits', 'variable bits, 'witness num' and 'variable num' that are parseable values for groth16.
-// K represents any u-value: u8, u16 etc. P is a placeholder for Paths.
-// wb .. vn is constructed like this as the variables should be fed in witness bits -> witness num -> var num -> var bits in the (in of the .zk).
 #[derive(Serialize, Deserialize)]
-pub struct Knowledge<K> {
-    pub wb: Vec<K>,
-    pub vb: Vec<K>,
-    pub wn: Vec<K>,
-    pub vn: Vec<K>,
+pub struct Knowledge {
+    pub wb: Vec<usize>,
+    pub vb: Vec<usize>,
+    pub wn: Vec<usize>,
+    pub vn: Vec<usize>,
     pub ut: String,
 }
 
-// impl to derive the 'new' and function for the Knowledge struct which builds a Proof object.
-// Knowledge can hold any u value provided it is consistent through the struct.
-// K --> u16 etc which are all PrimInts from the Num crate, P is a Path. 
-impl<'de, K, T, V, W> zkProof<T, V, W> for Knowledge<K>
-where
-    K: PrimInt,
-    T: EllipticEncryptable<G1 = V, G2 = W>
-            + Field
+impl zkProof for Knowledge {
+    fn new<C, T, U, V>(self, crs: C) -> Proof<U, V> 
+    where
+        C: Common<T, U, V>,
+        T: EllipticEncryptable<G1 = U, G2 = V> 
+            + Random 
+            + Field 
+            + Copy 
+            + PartialEq
             + From<usize>
-            + FromStr
-            + groth16::Random
-            + From<K>
-            + Serialize 
-            + Deserialize<'de>,
-    V: Add<Output=V> + Sub<Output=V> + Sum + Copy + Serialize + Deserialize<'de>,
-    W: Add<Output=W> + Sum + Copy + Serialize + Deserialize<'de>,
-{
-    // builds a proof from the provided values using .zk program pulled from the Paths.
-    // takes T: any field e.g. Z655, Z251 etc. , V: SigmaG1<FIELD> type, W: SigmaG2<FIELD> type.
-    // returns the groth16::Proof struct which takes G1 and G2 as type arguments.
-    // asssignments holds a vec of fields that can be parsed by the groth16 weights argument.
-    // appends witness bits/nums and variable bits/nums only where values are present in the Knowledge struct.
-    // TODO: replace Vec::new() with alternative to reduce load on heap-mem.
-    // See Transform mod for methods
-    fn new(self, crs: CommonReference<T, V, W>) -> Proof<V, W> {    
+            + FromStr,
+        U: Add<Output=U> + Sub<Output=U> + Sum + Copy,
+        V: Add<Output=V> + Sum + Copy,
+    {    
         let mut assignments = Vec::new();
         match self.wb.collect_bits(&self.ut) {
             Some(mut x) => assignments.append(&mut x),
@@ -82,48 +86,52 @@ where
             Some(mut x) => assignments.append(&mut x),
             _ => {}
         };
-        // generates the 'weights' for the zkSNARK.
-        let weights = groth16::weights(&crs.code, &assignments).expect("groth16::weights");    
-        // builds the proof returned from the function.
-        // T = field e.g FrLocal, V = G1 e.g. G1Local or Z251 as EllipticEncryptable, W = G2 e.g. G2Local or Z251 as EllipticEncryptable.
-        groth16::prove::<CoefficientPoly<T>, T, V, W>(
-            &crs.qap,
-            (&crs.sg1, &crs.sg2),
+        let (code, qap, sg1, sg2) = crs.get();
+        let weights = groth16::weights(&code, &assignments).expect("groth16::weights");    
+        groth16::prove(
+            &qap,
+            (&sg1, &sg2),
             &weights
         )
     }
 }
 
-// 'Marker' holds the verification values as verification bits and verification nums.
-pub struct Marker<L> {
-    pub vn: Vec<L>,
-    pub vb: Vec<L>,
+impl Knowledge {
+    pub fn init(
+        wb: Vec<usize>, vb: Vec<usize>, wn: Vec<usize>, vn: Vec<usize>, ut: String
+    ) -> Knowledge {
+        Self {
+            wb: wb,
+            vb: vb,
+            wn: wn,
+            vn: vn,
+            ut: ut,
+        }
+    }
+}
+
+pub struct Marker {
+    pub vn: Vec<usize>,
+    pub vb: Vec<usize>,
     pub ut: String,
 }
 
-// impl for the 'check' which is just a verification of a proof that can be called by the prover/verifier.
-// takes L: PrimInt --> u16, u8 etc... for the ^^^ verification values, P for the crs struct.
-impl<'de, L, U, R, S> zkVerify<U, R, S> for Marker<L>
-where
-    L: PrimInt,
-    U: EllipticEncryptable<G1 = R, G2 = S>
-            + Field
-            + From<usize>
-            + FromStr
-            + groth16::Random
-            + From<L>
-            + Serialize 
-            + Deserialize<'de>,
-    R: Add<Output=R> + Sub<Output=R> + Sum + Copy + Serialize + Deserialize<'de>,
-    S: Add<Output=S> + Sum + Copy + Serialize + Deserialize<'de>,
-    
-{
-    // check takes R == G1, S == G2, T == GT, U == field e.g. Z655, Z251 etc...
-    // returns bool whether proof is correct. 
-    fn check(self, crs: CommonReference<U, R, S>, prf: Proof<R,S>) -> bool {
-        // stores verification values as fields that are parseable with groth16::verify. 
-        // See Transform mod for methods.
-        let mut inputs: Vec<U> = Vec::new();
+impl zkVerify for Marker {
+    fn check<C, T, U, V, W>(self, crs: C, prf: Proof<U, V>) -> bool 
+    where 
+        C: Common<T, U, V>,
+        T: Field 
+            + From<usize> 
+            + Copy 
+            + EllipticEncryptable<G1 = U, G2 = V, GT = W>,
+        U: Sum,
+        V: Add<Output=V> 
+            + Sum 
+            + Copy,
+        W: Add<Output = W> 
+            + PartialEq, 
+    {
+        let mut inputs: Vec<T> = Vec::new();
         match self.vn.collect_nums() {
             Some(mut x) => inputs.append(&mut x),
             _ => {}
@@ -132,10 +140,9 @@ where
             Some(mut x) => inputs.append(&mut x),
             _ => {}
         };
-
-        // checks whether a proof is correct and returns a bool.
-        groth16::verify::<CoefficientPoly<U>, _, _, _, _>(
-            (crs.sg1, crs.sg2),
+        let (_, _, sg1, sg2) = crs.get();
+        groth16::verify::<CoefficientPoly<T>, _, _, _, _>(
+            (sg1, sg2),
             &inputs,
             prf
         )
@@ -169,7 +176,7 @@ mod tests {
         // verify 18 = (9) (2)
         // enclosure for convenience to build a proof.
         let gen = |a, b: usize| -> Proof<G1Local, G2Local> {
-            let k = Knowledge::<usize> {
+            let k = Knowledge {
                 wb: Vec::new(),
                 wn: vec![a, b],
                 vn: Vec::new(),
@@ -177,17 +184,17 @@ mod tests {
                 ut: "".to_string(),
             };
             let _crs = CommonReference {
-                code: read_to_string("src/tests/files/knowledge/simple.zk").expect("internal_test: reading code to string"),
+                code: read_to_string("src/tests/files/simple/simple.zk").expect("internal_test: reading code to string"),
                 qap: from_str::<QAP<CoefficientPoly<FrLocal>>>(
-                    &read_to_string("src/tests/files/knowledge/simple.qap")
+                    &read_to_string("src/tests/files/simple/simple.qap")
                         .expect("internal_test: reading QAP to string")
                 ).expect("internal_test: parsing QAP from string"),
                 sg1: from_str::<SigmaG1<G1Local>>(
-                    &read_to_string("src/tests/files/knowledge/simple.sg1")
+                    &read_to_string("src/tests/files/simple/simple.sg1")
                         .expect("internal_test: reading SigmaG1 to string")
                 ).expect("internal_test: parsing SigmaG1 from string"),
                 sg2: from_str::<SigmaG2<G2Local>>(
-                    &read_to_string("src/tests/files/knowledge/simple.sg2")
+                    &read_to_string("src/tests/files/simple/simple.sg2")
                         .expect("internal_test: reading SigmaG2 to string")
                 ).expect("internal_test: parsing SigmaG2 from string"),
             };
@@ -196,23 +203,23 @@ mod tests {
         };
         //  enclosure for convenience for checking a proof.
         let check = |a: usize, k: Proof<G1Local, G2Local>| -> bool {
-            let m = Marker::<usize> {
+            let m = Marker {
                 vb: Vec::new(),
                 vn: vec![a],
                 ut: "".to_string(),
             };
             let _crs = CommonReference {
-                code: read_to_string("src/tests/files/knowledge/simple.zk").expect("internal_test: reading code to string"),
+                code: read_to_string("src/tests/files/simple/simple.zk").expect("internal_test: reading code to string"),
                 qap: from_str::<QAP<CoefficientPoly<FrLocal>>>(
-                    &read_to_string("src/tests/files/knowledge/simple.qap")
+                    &read_to_string("src/tests/files/simple/simple.qap")
                         .expect("internal_test: reading QAP to string")
                 ).expect("internal_test: parsing QAP from string"),
                 sg1: from_str::<SigmaG1<G1Local>>(
-                    &read_to_string("src/tests/files/knowledge/simple.sg1")
+                    &read_to_string("src/tests/files/simple/simple.sg1")
                         .expect("internal_test: reading SigmaG1 to string")
                 ).expect("internal_test: parsing SigmaG1 from string"),
                 sg2: from_str::<SigmaG2<G2Local>>(
-                    &read_to_string("src/tests/files/knowledge/simple.sg2")
+                    &read_to_string("src/tests/files/simple/simple.sg2")
                         .expect("internal_test: reading SigmaG2 to string")
                 ).expect("internal_test: parsing SigmaG2 from string"),
             };
@@ -234,10 +241,5 @@ mod tests {
             false,
             check(6, gen(1, 2))
         );      
-    }
-
-    #[test]
-    fn test_zkProof_zkVerify_wrap_unwrap() {
-
     }
 }
