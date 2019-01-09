@@ -1,10 +1,16 @@
 use serde::{Serialize, Deserialize}; 
 use serde_derive::{Serialize, Deserialize};
+use serde_json::{from_str, to_string};
 use zksnark::{
     Proof,
     CoefficientPoly,
     field::Field,
     groth16,
+    groth16::fr::{
+        FrLocal, 
+        G1Local, 
+        G2Local,
+    },
     groth16::{
         EllipticEncryptable,
         Random,
@@ -19,66 +25,64 @@ use crate::{
     knowledge::{Knowledge, zkProof},
     common::{CommonReference, Common},
     };
-use num::PrimInt;
 
 pub trait Transportable {
     fn wrap_as_str(&self) -> String;
     fn unwrap_from_str(m: String) -> Self; 
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Backpack<V, W> {
-    prf: Proof<V, W>,
-    ver: Vec<u8>,
-    tag: String,
-    sig: Vec<u8>,
-    puk: Vec<u8>,    
+pub trait InterOperable {
+    type Operator: Transportable;
+    fn go(self) -> Self::Operator;
 }
 
-
 #[derive(Serialize, Deserialize)]
-pub struct Andromeda<T, U> {
-    weights: T,
-    crs: U,
+pub struct Andromeda<A, B> {
+    crs: A,
+    weights: B,
 }
 
-impl<V, W> Transportable for Backpack<V, W> 
-where
-    for <'de> 
-    V: Add<Output=V> + Sub<Output=V> + Sum + Copy + Serialize + Deserialize<'de>,
-    for <'de> 
-    W: Add<Output=W> + Sum + Copy + Serialize + Deserialize<'de>,
+impl<A, B> Andromeda<A, B> 
+where 
+    A: Common<FrLocal, G1Local, G2Local>,
+    B: zkProof,
 {
-    fn wrap_as_str(&self) -> String {
-        use serde_json::to_string;
-        match to_string(self) {
-            Ok(s) => s,
-            Err(e) => panic!("BackPack::wrap_as_str() parsing &self as string: {}", e),
-        }
-    }
-    fn unwrap_from_str(m: String) -> Self{
-        use serde_json::from_str;
-        match from_str::<Self>(&m) {
-            Ok(s) => s,
-            Err(e) => panic!("BackPack::unwrap_from_str() parsing m: N from String: {}", e)
+    pub fn init(crs: A, weights: B) -> Andromeda<A, B> {
+        Self {
+            crs: crs,
+            weights: weights,
         }
     }
 }
 
-// impl<T, U, X, Y, Z> zkProof<X, Y, Z> for Andromeda<T, U> {
-   // fn new(self, crs: CommonReference<T, V, W>) -> Proof<V, W>;
-// }
-
-impl<T, U> Transportable for Andromeda<T, U>
+impl<A, B> InterOperable for Andromeda<A, B> 
 where
-    for <'de> 
-    T: Serialize 
+    A: Common<FrLocal, G1Local, G2Local>,
+    B: zkProof,
+{  
+    type Operator = BackPack<G1Local, G2Local>;
+    fn go(self) -> Self::Operator {
+        BackPack {
+            prf: self.weights.new(self.crs),
+            ver: Vec::new(),
+            tag: "Kill ME".to_string(),
+            sig: b"Sign that Bad Boi".to_vec(),
+            puk: b"Witness Me".to_vec()
+        }
+    }
+}
+
+impl<A, B> Transportable for Andromeda<A, B> 
+where
+    for <'de>
+    A: Common<FrLocal, G1Local, G2Local> 
+        + Serialize
         + Deserialize<'de>,
-    for <'de> 
-    U: Common
-        + Serialize 
-        + Deserialize<'de>
- {
+    for <'de>
+    B: zkProof 
+        + Serialize
+        + Deserialize<'de>,
+{
     fn wrap_as_str(&self) -> String {
         use serde_json::to_string;
         match to_string(self) {
@@ -95,48 +99,43 @@ where
     }
 }
 
-impl<K> Transportable for Knowledge<K> 
-where   
-    for <'de> 
-    K: PrimInt + Serialize + Deserialize<'de>
-{
-    fn wrap_as_str(&self) -> String {
-        use serde_json::to_string;
-        match to_string(self) {
-            Ok(s) => s,
-            Err(e) => panic!("Knowledge::wrap_as_str() parsing &self as string: {}", e),
-        }
-    }
-    fn unwrap_from_str(m: String) -> Self{
-        use serde_json::from_str;
-        match from_str::<Self>(&m) {
-            Ok(s) => s,
-            Err(e) => panic!("Knowledge::unwrap_from_str() parsing m: N from String: {}", e)
-        }
-    }
+#[derive(Serialize, Deserialize)]
+pub struct BackPack<V, W> {
+    prf: Proof<V, W>,
+    ver: Vec<usize>,
+    tag: String,
+    sig: Vec<u8>,
+    puk: Vec<u8>,    
 }
 
-impl<F, G, H> Transportable for CommonReference<F, G, H> 
+impl<V, W> Transportable for BackPack<V, W> 
 where
     for <'de>
-    F: Serialize + Deserialize<'de>,
+    V: Add<Output=V> 
+        + Sub<Output=V> 
+        + Sum 
+        + Copy 
+        + Serialize 
+        + Deserialize<'de>,
     for <'de>
-    G: Serialize + Deserialize<'de>,
-    for <'de>
-    H: Serialize + Deserialize<'de>,
+    W: Add<Output=W> 
+        + Sum 
+        + Copy 
+        + Serialize 
+        + Deserialize<'de>,
 {
     fn wrap_as_str(&self) -> String {
         use serde_json::to_string;
         match to_string(self) {
             Ok(s) => s,
-            Err(e) => panic!("CommonReference::wrap_as_str() parsing &self as string: {}", e),
+            Err(e) => panic!("BackPack::wrap_as_str() parsing &self as string: {}", e),
         }
     }
     fn unwrap_from_str(m: String) -> Self{
         use serde_json::from_str;
         match from_str::<Self>(&m) {
             Ok(s) => s,
-            Err(e) => panic!("CommonReference::unwrap_from_str() parsing m: N from String: {}", e)
+            Err(e) => panic!("BackPack::unwrap_from_str() parsing m: N from String: {}", e)
         }
     }
 }
@@ -157,25 +156,26 @@ mod test {
     use crate::{
         common::{
             CommonReference, 
-            Common
+            Common, 
+            RefFinder
         },
-        knowledge::{Knowledge},
+        knowledge::{Knowledge, Marker, zkVerify},
         interface::Andromeda,
     };
 
     fn quick_get_crs() -> CommonReference<FrLocal, G1Local, G2Local> {
         let _crs = CommonReference {
-            code: read_to_string("src/tests/files/interface/simple.zk").expect("internal_test: reading code to string"),
+            code: read_to_string("src/tests/files/simple/simple.zk").expect("internal_test: reading code to string"),
             qap: from_str::<QAP<CoefficientPoly<FrLocal>>>(
-                &read_to_string("src/tests/files/interface/simple.qap")
+                &read_to_string("src/tests/files/simple/simple.qap")
                     .expect("internal_test: reading QAP to string")
             ).expect("internal_test: parsing QAP from string"),
             sg1: from_str::<SigmaG1<G1Local>>(
-                &read_to_string("src/tests/files/interface/simple.sg1")
+                &read_to_string("src/tests/files/simple/simple.sg1")
                     .expect("internal_test: reading SigmaG1 to string")
             ).expect("internal_test: parsing SigmaG1 from string"),
             sg2: from_str::<SigmaG2<G2Local>>(
-                &read_to_string("src/tests/files/interface/simple.sg2")
+                &read_to_string("src/tests/files/simple/simple.sg2")
                     .expect("internal_test: reading SigmaG2 to string")
             ).expect("internal_test: parsing SigmaG2 from string"),
         };
@@ -186,16 +186,25 @@ mod test {
     #[test]
     fn test_andromeda_parsing() {
         let crs = quick_get_crs();
-        let weights = Knowledge::<usize> {
+        let weights = Knowledge {
             wb: Vec::new(),
             wn: vec![20, 5],
             vn: Vec::new(),
             vb: Vec::new(),
             ut: "".to_string(),
         };
-        let _andromeda = Andromeda {
+        let andromeda = Andromeda {
             weights: weights,
             crs: crs,
         };
+        let x = andromeda.go();
+        let m = Marker {
+            vn: vec![100],
+            vb: Vec::new(),
+            ut: "".to_string(),
+        };
+        let crs = quick_get_crs();
+        let b = m.check(crs, x.prf);
+        assert!(b);
     }
 }

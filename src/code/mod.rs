@@ -4,6 +4,7 @@ pub mod comparator;
 // FOR COMPARISON, ASSERT 0 < A < B AS A SUBSTITUTE TO AVOID A BEING > BUT BEING PARSED AS < BECAUSE OF TWO'S COMPLEMENT.
 
 // todo: improve testing to check that certain lines exist in the generated files.
+#[ignore]
 #[test]
 fn test_comparator_code_gen() {
     use std::path::Path;
