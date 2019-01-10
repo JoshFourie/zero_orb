@@ -191,3 +191,19 @@ fn test_read_reference() {
         false => panic!("CommonReference: crs.sg2 != sg2"),
     };
 }
+
+#[ignore]
+#[test]
+fn write_test_crs() {
+    use zksnark::groth16::fr::{FrLocal, G1Local, G2Local};
+
+    let code = String::from(
+        "(in a b) (out x) (verify x) (program (= x (* a b)))"
+    );
+    let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::new(code);
+    let file = File::create("src/tests/files/crs/sample.crs").expect("Internal_test: file::create panicked")
+        .write_all(
+            to_string(&crs).expect("Internal_test: file.write_all()").as_bytes()
+        );
+
+}

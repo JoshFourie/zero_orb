@@ -163,35 +163,17 @@ mod test {
         interface::{Andromeda, InterOperable},
     };
 
-    fn quick_get_crs() -> CommonReference<FrLocal, G1Local, G2Local> {
-        let _crs = CommonReference {
-            code: read_to_string("src/tests/files/simple/simple.zk").expect("internal_test: reading code to string"),
-            qap: from_str::<QAP<CoefficientPoly<FrLocal>>>(
-                &read_to_string("src/tests/files/simple/simple.qap")
-                    .expect("internal_test: reading QAP to string")
-            ).expect("internal_test: parsing QAP from string"),
-            sg1: from_str::<SigmaG1<G1Local>>(
-                &read_to_string("src/tests/files/simple/simple.sg1")
-                    .expect("internal_test: reading SigmaG1 to string")
-            ).expect("internal_test: parsing SigmaG1 from string"),
-            sg2: from_str::<SigmaG2<G2Local>>(
-                &read_to_string("src/tests/files/simple/simple.sg2")
-                    .expect("internal_test: reading SigmaG2 to string")
-            ).expect("internal_test: parsing SigmaG2 from string"),
-        };
-        let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(&to_string(&_crs).unwrap());
-        crs
-    }
-
     #[test]
     fn test_andromeda_parsing() {
-        let crs = quick_get_crs();
+        let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(
+            &read_to_string("src/tests/files/crs/sample.crs").unwrap()
+        );
         let weights = Knowledge {
-            wb: Vec::new(),
-            wn: vec![20, 5],
-            vn: Vec::new(),
-            vb: Vec::new(),
-            ut: "".to_string(),
+            wb: None,
+            wn: Some(vec![20, 5]),
+            vn: None,
+            vb: None,
+            ut: None,
         };
         let andromeda = Andromeda {
             weights: weights,
@@ -199,11 +181,13 @@ mod test {
         };
         let x = andromeda.go();
         let m = Marker {
-            vn: vec![100],
-            vb: Vec::new(),
-            ut: "".to_string(),
+            vn: Some(vec![100]),
+            vb: None,
+            ut: None,
         };
-        let crs = quick_get_crs();
+        let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(
+            &read_to_string("src/tests/files/crs/sample.crs").unwrap()
+        );
         let b = m.check(crs, x.prf);
         assert!(b);
     }

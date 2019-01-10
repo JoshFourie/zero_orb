@@ -48,11 +48,11 @@ pub trait zkVerify {
 
 #[derive(Serialize, Deserialize)]
 pub struct Knowledge {
-    pub wb: Vec<usize>,
-    pub vb: Vec<usize>,
-    pub wn: Vec<usize>,
-    pub vn: Vec<usize>,
-    pub ut: String,
+    pub wb: Option<Vec<usize>>,
+    pub vb: Option<Vec<usize>>,
+    pub wn: Option<Vec<usize>>,
+    pub vn: Option<Vec<usize>>,
+    pub ut: Option<String>,
 }
 
 impl zkProof for Knowledge {
@@ -69,23 +69,33 @@ impl zkProof for Knowledge {
         U: Add<Output=U> + Sub<Output=U> + Sum + Copy,
         V: Add<Output=V> + Sum + Copy,
     {    
-        let mut assignments = Vec::new();
-        match self.wb.collect_bits(&self.ut) {
-            Some(mut x) => assignments.append(&mut x),
-            _ => {},
-        };
-        match self.vb.collect_bits(&self.ut) {
-            Some(mut x) => assignments.append(&mut x),
-            _ => {},
-        };
-        match self.wn.collect_nums() {
-            Some(mut x) => assignments.append(&mut x),
-            _ => {},
-        };
-        match self.vn.collect_nums() {
-            Some(mut x) => assignments.append(&mut x),
-            _ => {}
-        };
+        let mut assignments: Vec<T> = Vec::new();
+        match self.wb {
+            Some(vec) => {
+                match self.ut.clone() {
+                    Some(tag) => assignments.append(&mut vec.collect_bits(&tag)),
+                    None => {},
+                };
+            },
+            None => {}, 
+        }
+        match self.vb {
+            Some(vec) => {
+                match self.ut {
+                    Some(tag) => assignments.append(&mut vec.collect_bits(&tag)),
+                    None => {},
+                };
+            },
+            None => {}, 
+        }
+        match self.wn {
+            Some(vec) => assignments.append(&mut vec.collect_nums()),
+            None => {}, 
+        }
+        match self.vn {
+            Some(vec) => assignments.append(&mut vec.collect_nums()),
+            None => {}, 
+        }
         let (code, qap, sg1, sg2) = crs.get();
         let weights = groth16::weights(&code, &assignments).expect("groth16::weights");    
         groth16::prove(
@@ -98,7 +108,11 @@ impl zkProof for Knowledge {
 
 impl Knowledge {
     pub fn init(
-        wb: Vec<usize>, vb: Vec<usize>, wn: Vec<usize>, vn: Vec<usize>, ut: String
+        wb: Option<Vec<usize>>, 
+        vb: Option<Vec<usize>>, 
+        wn: Option<Vec<usize>>, 
+        vn: Option<Vec<usize>>, 
+        ut: Option<String>
     ) -> Knowledge {
         Self {
             wb: wb,
@@ -111,9 +125,9 @@ impl Knowledge {
 }
 
 pub struct Marker {
-    pub vn: Vec<usize>,
-    pub vb: Vec<usize>,
-    pub ut: String,
+    pub vn: Option<Vec<usize>>,
+    pub vb: Option<Vec<usize>>,
+    pub ut: Option<String>,
 }
 
 impl zkVerify for Marker {
@@ -132,14 +146,19 @@ impl zkVerify for Marker {
             + PartialEq, 
     {
         let mut inputs: Vec<T> = Vec::new();
-        match self.vn.collect_nums() {
-            Some(mut x) => inputs.append(&mut x),
-            _ => {}
-        };
-        match self.vb.collect_bits(&self.ut) {
-            Some(mut x) => inputs.append(&mut x),
-            _ => {}
-        };
+        match self.vn {
+            Some(vec) => inputs.append(&mut vec.collect_nums()),
+            None => {}, 
+        }
+        match self.vb {
+            Some(vec) => {
+                match self.ut {
+                    Some(tag) => inputs.append(&mut vec.collect_bits(&tag)),
+                    None => {},
+                };
+            },
+            None => {}, 
+        }
         let (_, _, sg1, sg2) = crs.get();
         groth16::verify::<CoefficientPoly<T>, _, _, _, _>(
             (sg1, sg2),
@@ -177,53 +196,27 @@ mod tests {
         // enclosure for convenience to build a proof.
         let gen = |a, b: usize| -> Proof<G1Local, G2Local> {
             let k = Knowledge {
-                wb: Vec::new(),
-                wn: vec![a, b],
-                vn: Vec::new(),
-                vb: Vec::new(),
-                ut: "".to_string(),
+                wb: None,
+                wn: Some(vec![a, b]),
+                vn: None,
+                vb: None,
+                ut: None,
             };
-            let _crs = CommonReference {
-                code: read_to_string("src/tests/files/simple/simple.zk").expect("internal_test: reading code to string"),
-                qap: from_str::<QAP<CoefficientPoly<FrLocal>>>(
-                    &read_to_string("src/tests/files/simple/simple.qap")
-                        .expect("internal_test: reading QAP to string")
-                ).expect("internal_test: parsing QAP from string"),
-                sg1: from_str::<SigmaG1<G1Local>>(
-                    &read_to_string("src/tests/files/simple/simple.sg1")
-                        .expect("internal_test: reading SigmaG1 to string")
-                ).expect("internal_test: parsing SigmaG1 from string"),
-                sg2: from_str::<SigmaG2<G2Local>>(
-                    &read_to_string("src/tests/files/simple/simple.sg2")
-                        .expect("internal_test: reading SigmaG2 to string")
-                ).expect("internal_test: parsing SigmaG2 from string"),
-            };
-            let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(&to_string(&_crs).unwrap());
+            let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(
+                &read_to_string("src/tests/files/crs/sample.crs").unwrap()
+            );
             k.new(crs)
         };
         //  enclosure for convenience for checking a proof.
         let check = |a: usize, k: Proof<G1Local, G2Local>| -> bool {
             let m = Marker {
-                vb: Vec::new(),
-                vn: vec![a],
-                ut: "".to_string(),
+                vb: None,
+                vn: Some(vec![a]),
+                ut: None,
             };
-            let _crs = CommonReference {
-                code: read_to_string("src/tests/files/simple/simple.zk").expect("internal_test: reading code to string"),
-                qap: from_str::<QAP<CoefficientPoly<FrLocal>>>(
-                    &read_to_string("src/tests/files/simple/simple.qap")
-                        .expect("internal_test: reading QAP to string")
-                ).expect("internal_test: parsing QAP from string"),
-                sg1: from_str::<SigmaG1<G1Local>>(
-                    &read_to_string("src/tests/files/simple/simple.sg1")
-                        .expect("internal_test: reading SigmaG1 to string")
-                ).expect("internal_test: parsing SigmaG1 from string"),
-                sg2: from_str::<SigmaG2<G2Local>>(
-                    &read_to_string("src/tests/files/simple/simple.sg2")
-                        .expect("internal_test: reading SigmaG2 to string")
-                ).expect("internal_test: parsing SigmaG2 from string"),
-            };
-            let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(&to_string(&_crs).unwrap());
+            let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(
+                &read_to_string("src/tests/files/crs/sample.crs").unwrap()
+            );
             m.check(crs, k)
         };
         // 3 x 2 = 6.
