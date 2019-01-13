@@ -1,16 +1,6 @@
-use serde::{Serialize, Deserialize}; 
-use serde_derive::{Serialize, Deserialize};
-use serde_json::{from_str, to_string};
 use zksnark::{
-    Proof,
-    CoefficientPoly,
+    Proof, 
     field::Field,
-    groth16,
-    groth16::fr::{
-        FrLocal, 
-        G1Local, 
-        G2Local,
-    },
     groth16::{
         EllipticEncryptable,
         Random,
@@ -20,147 +10,212 @@ use std::{
     str::FromStr,
     ops::{Add, Sub},
     iter::Sum,
+    marker::PhantomData,
+};
+use ring::{
+    signature::{
+        Ed25519KeyPair, 
+        KeyPair
+        },
 };
 use crate::{
-    knowledge::{Knowledge, zkProof},
-    common::{CommonReference, Common},
-    };
+    knowledge::zkProof,
+    common::Common,
+    crypto::{EdDSA, SignatureScheme},
+};
+use serde_derive::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize};
 
-pub trait Transportable {
-    fn wrap_as_str(&self) -> String;
-    fn unwrap_from_str(m: String) -> Self; 
+pub trait GoZero<'de> {
+    type Returner: Serialize + Deserialize<'de>;
+    fn go(self) -> Self::Returner;
 }
 
-pub trait InterOperable {
-    type Operator: Transportable;
-    fn go(self) -> Self::Operator;
+pub trait MarkZero {   
+    fn verify(self) -> bool;
+}
+
+pub struct Andromeda<A, B, T, U, V, W> {
+    crs: A,
+    weights: B,
+    compute_out: Option<Vec<usize>>,
+    key_pair: Ed25519KeyPair,
+    _phantom_fr: PhantomData<T>,
+    _phantom_g1: PhantomData<U>,
+    _phantom_g2: PhantomData<V>,
+    _phantom_gt: PhantomData<W>, 
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Andromeda<A, B> {
+pub struct BackPack<A, T, U, V, W> {
+    prf: Proof<U, V>,
+    ver: Option<Vec<usize>>,
+    tag: String,
+    sig: Vec<u8>,
+    puk: Vec<u8>,
     crs: A,
-    weights: B,
+    _phantom_fr: PhantomData<T>,
+    _phantom_gt: PhantomData<W>,
 }
 
-impl<A, B> Andromeda<A, B> 
-where 
-    A: Common<FrLocal, G1Local, G2Local>,
-    B: zkProof,
-{
-    pub fn init(crs: A, weights: B) -> Andromeda<A, B> {
+impl<A, T, U, V, W> BackPack<A, T, U, V, W> {
+    pub fn into(
+        prf: Proof<U, V>,
+        ver: Option<Vec<usize>>,
+        tag: String,
+        sig: Vec<u8>,
+        puk: Vec<u8>,    
+        crs: A,
+    ) -> Self {
+        BackPack {
+            prf: prf,
+            ver: ver,
+            tag: tag,
+            sig: sig,
+            puk: puk,    
+            crs: crs,
+            _phantom_fr: PhantomData::<T>,
+            _phantom_gt: PhantomData::<W>,
+        }
+    }
+}
+
+impl<A, B, T, U, V, W> Andromeda<A, B, T, U, V, W> {
+    pub fn into(
+        crs: A, 
+        weights: B, 
+        compute_out: Option<Vec<usize>>,
+        key_pair: Ed25519KeyPair
+    ) -> Andromeda<A, B, T, U, V, W> {
         Self {
             crs: crs,
             weights: weights,
+            key_pair: key_pair,
+            compute_out: compute_out,
+            _phantom_fr: PhantomData::<T>,
+            _phantom_g1: PhantomData::<U>,
+            _phantom_g2: PhantomData::<V>,
+            _phantom_gt: PhantomData::<W>, 
         }
     }
 }
 
-impl<A, B> InterOperable for Andromeda<A, B> 
+impl<'de, A, B, T, U, V, W> GoZero<'de> for Andromeda<A, B, T, U, V, W> 
 where
-    A: Common<FrLocal, G1Local, G2Local>,
+    A: Common<T, U, V>
+        + Serialize
+        + Deserialize<'de>,
     B: zkProof,
+    T: Field 
+        + From<usize> 
+        + Copy 
+        + EllipticEncryptable<G1 = U, G2 = V, GT = W>
+        + Random
+        + FromStr
+        + Serialize
+        + Deserialize<'de>,
+    U: Add<Output=U>
+        + Sum
+        + Sub<Output=U> 
+        + Copy
+        + Serialize
+        + Deserialize<'de>,
+    V: Add<Output=V> 
+        + Sum 
+        + Copy
+        + Serialize
+        + Deserialize<'de>,
+    W: Add<Output = W> 
+        + PartialEq, 
 {  
-    type Operator = BackPack<G1Local, G2Local>;
-    fn go(self) -> Self::Operator {
-        BackPack {
-            prf: self.weights.new(self.crs),
-            ver: Vec::new(),
-            tag: "Kill ME".to_string(),
-            sig: b"Sign that Bad Boi".to_vec(),
-            puk: b"Witness Me".to_vec()
-        }
-    }
-}
+    type Returner = BackPack<A, T, U, V, W>;
 
-impl<A, B> Transportable for Andromeda<A, B> 
-where
-    for <'de>
-    A: Common<FrLocal, G1Local, G2Local> 
-        + Serialize
-        + Deserialize<'de>,
-    for <'de>
-    B: zkProof 
-        + Serialize
-        + Deserialize<'de>,
-{
-    fn wrap_as_str(&self) -> String {
+    fn go(self) -> Self::Returner {
         use serde_json::to_string;
-        match to_string(self) {
-            Ok(s) => s,
-            Err(e) => panic!("Andromeda::wrap_as_str() parsing &self as string: {}", e),
-        }
-    }
-    fn unwrap_from_str(m: String) -> Self{
-        use serde_json::from_str;
-        match from_str::<Self>(&m) {
-            Ok(s) => s,
-            Err(e) => panic!("Andromeda::unwrap_from_str() parsing m: N from String: {}", e)
-        }
+        let prf = self.weights.new(self.crs.clone());
+        let sig = EdDSA::into(
+            to_string(&prf)
+            .expect("Andromemda::GoZero::go() failed to parse &prf as a string for the EdDSA tuple-struct")   
+        ).sign_message(&self.key_pair);
+        BackPack::into(
+            prf,
+            self.compute_out,
+            "tag_blank".to_string(),
+            sig.as_ref()
+                .to_vec(),
+            self.key_pair
+                .public_key()
+                .as_ref()
+                .to_vec(),
+            self.crs,
+        )
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct BackPack<V, W> {
-    prf: Proof<V, W>,
-    ver: Vec<usize>,
-    tag: String,
-    sig: Vec<u8>,
-    puk: Vec<u8>,    
-}
-
-impl<V, W> Transportable for BackPack<V, W> 
+// Should pull the relevant VN and VB values from a database, but for the interim we'll hardcode this.
+impl<A, T, U, V, W> MarkZero for BackPack<A, T, U, V, W> 
 where
+    A: Common<T, U, V>,
+    for <'de>
+    T: Field 
+        + From<usize> 
+        + Copy 
+        + EllipticEncryptable<G1 = U, G2 = V, GT = W>
+        + Serialize
+        + Deserialize<'de>,
+    for <'de>
+    U: Sum
+        + Serialize
+        + Deserialize<'de>,
     for <'de>
     V: Add<Output=V> 
-        + Sub<Output=V> 
         + Sum 
-        + Copy 
-        + Serialize 
+        + Copy
+        + Serialize
         + Deserialize<'de>,
     for <'de>
-    W: Add<Output=W> 
-        + Sum 
-        + Copy 
-        + Serialize 
-        + Deserialize<'de>,
+    W: Add<Output = W> 
+        + PartialEq, 
 {
-    fn wrap_as_str(&self) -> String {
+    fn verify(self) -> bool {
         use serde_json::to_string;
-        match to_string(self) {
-            Ok(s) => s,
-            Err(e) => panic!("BackPack::wrap_as_str() parsing &self as string: {}", e),
-        }
-    }
-    fn unwrap_from_str(m: String) -> Self{
-        use serde_json::from_str;
-        match from_str::<Self>(&m) {
-            Ok(s) => s,
-            Err(e) => panic!("BackPack::unwrap_from_str() parsing m: N from String: {}", e)
+        use crate::{
+            knowledge::{Marker, zkVerify},
+            crypto::{EdDSA, SignatureScheme},
+        };
+        match (
+            EdDSA::into(
+                to_string(&self.prf).unwrap()
+            ).verify_signature(
+                &self.sig,
+                &self.puk
+            ),
+            Marker::into(
+                self.ver,
+                None,
+                None,
+            ).check(
+                self.crs,
+                self.prf,
+            ),
+        ) {
+            (true, true) => true,
+            (_, _) => false
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use zksnark::{
-        groth16::{
-            fr::{
-                FrLocal, G1Local, G2Local, GtLocal
-            },
-            Proof, QAP, SigmaG1, SigmaG2,
-        },
-        CoefficientPoly,
+    use zksnark::groth16::fr::{
+        FrLocal, G1Local, G2Local,
     };
     use std::fs::read_to_string;
-    use serde_json::{from_str, to_string};
     use crate::{
-        common::{
-            CommonReference, 
-            Common, 
-            RefFinder
-        },
-        knowledge::{Knowledge, Marker, zkVerify},
-        interface::{Andromeda, InterOperable},
+        common::{CommonReference, Common},
+        crypto::{EdDSA, SignatureScheme},
+        knowledge::Knowledge,
+        interface::{GoZero, MarkZero, Andromeda},
     };
 
     #[test]
@@ -168,27 +223,21 @@ mod test {
         let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(
             &read_to_string("src/tests/files/crs/sample.crs").unwrap()
         );
-        let weights = Knowledge {
-            wb: None,
-            wn: Some(vec![20, 5]),
-            vn: None,
-            vb: None,
-            ut: None,
-        };
-        let andromeda = Andromeda {
-            weights: weights,
-            crs: crs,
-        };
-        let x = andromeda.go();
-        let m = Marker {
-            vn: Some(vec![100]),
-            vb: None,
-            ut: None,
-        };
-        let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(
-            &read_to_string("src/tests/files/crs/sample.crs").unwrap()
+        let weights = Knowledge::into(
+            None, 
+            None,
+            Some(vec![20, 5]),
+            None,
+            None,
         );
-        let b = m.check(crs, x.prf);
-        assert!(b);
+        assert_eq!(
+            true,
+            Andromeda::into(
+                crs.clone(), 
+                weights, 
+                Some(vec![100]),
+                EdDSA::<String>::init_key_pair()
+            ).go().verify()
+        );
     }
 }

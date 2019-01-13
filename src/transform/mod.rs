@@ -6,7 +6,6 @@ pub mod wrapped_groth;
 fn test_collect_nums() {
     use crate::transform::into_field::IntoField;
     use zksnark::groth16::fr::FrLocal;
-    use serde_json::to_string;
 
     let x_8: Vec<usize> = vec![10, 13]; 
     let y_8 = vec![
@@ -32,7 +31,6 @@ fn test_collect_nums() {
 fn test_collect_bits() {
     use crate::transform::into_field::IntoField;
     use zksnark::groth16::fr::FrLocal;
-    use serde_json::to_string;
     
     let x_8: Vec<usize> = vec![15];
     let y_8 = vec![

@@ -48,11 +48,11 @@ pub trait zkVerify {
 
 #[derive(Serialize, Deserialize)]
 pub struct Knowledge {
-    pub wb: Option<Vec<usize>>,
-    pub vb: Option<Vec<usize>>,
-    pub wn: Option<Vec<usize>>,
-    pub vn: Option<Vec<usize>>,
-    pub ut: Option<String>,
+    wb: Option<Vec<usize>>,
+    vb: Option<Vec<usize>>,
+    wn: Option<Vec<usize>>,
+    vn: Option<Vec<usize>>,
+    ut: Option<String>,
 }
 
 impl zkProof for Knowledge {
@@ -107,7 +107,7 @@ impl zkProof for Knowledge {
 }
 
 impl Knowledge {
-    pub fn init(
+    pub fn into(
         wb: Option<Vec<usize>>, 
         vb: Option<Vec<usize>>, 
         wn: Option<Vec<usize>>, 
@@ -125,9 +125,9 @@ impl Knowledge {
 }
 
 pub struct Marker {
-    pub vn: Option<Vec<usize>>,
-    pub vb: Option<Vec<usize>>,
-    pub ut: Option<String>,
+    vn: Option<Vec<usize>>,
+    vb: Option<Vec<usize>>,
+    ut: Option<String>,
 }
 
 impl zkVerify for Marker {
@@ -168,16 +168,29 @@ impl zkVerify for Marker {
     }
 }
 
+impl Marker {
+    pub fn into(
+        vn: Option<Vec<usize>>,
+        vb: Option<Vec<usize>>,
+        ut: Option<String>,
+    ) -> Self {
+        Marker {
+            vn: vn,
+            vb: vb,
+            ut: ut,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use zksnark::{
         groth16::{
             fr::{
-                FrLocal, G1Local, G2Local, GtLocal
+                FrLocal, G1Local, G2Local
             },
-            Proof, QAP, SigmaG1, SigmaG2,
+            Proof, 
         },
-        CoefficientPoly,
     };
     use crate::{
         knowledge::{
@@ -186,8 +199,6 @@ mod tests {
         common::{CommonReference, Common},
     };
     use std::fs::read_to_string;
-    use serde_json::{from_str, to_string};
-
 
     #[test]
     fn test_simple_num() {

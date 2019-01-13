@@ -22,7 +22,7 @@ use crate::transform::wrapped_groth::{WrappedQAP, WrappedDummyRep};
 
 // Struct to access the code, QAP, SigmaG1 and SigmaG2 values.
 // F => a field, G => G1, H => G2.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CommonReference<T, U, V> {
     pub code: String,
     pub qap: QAP<CoefficientPoly<T>>,
@@ -40,7 +40,7 @@ pub struct RefFinder {
     pub sg2: String,
 }
 
-pub trait Common<T, U, V> {
+pub trait Common<T, U, V>: Clone {
     fn new(code: String) -> Self;
     fn read(s: &String) -> Self;
     fn get(self) -> (String, QAP<CoefficientPoly<T>>, SigmaG1<U>, SigmaG2<V>);
@@ -156,8 +156,6 @@ where
 fn test_read_reference() {
     use zksnark::{groth16, QAP, field::z251::Z251};
     use serde_json::to_string;
-    use std::fs::read_to_string;
-    use tempfile::tempdir;
     // expected results are that CommonReference::read() will return qap, sg1 and sg2 as before they were written to File.
     
     let code = String::from(
@@ -201,9 +199,9 @@ fn write_test_crs() {
         "(in a b) (out x) (verify x) (program (= x (* a b)))"
     );
     let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::new(code);
-    let file = File::create("src/tests/files/crs/sample.crs").expect("Internal_test: file::create panicked")
+    File::create("src/tests/files/crs/sample.crs").expect("Internal_test: file::create panicked")
         .write_all(
             to_string(&crs).expect("Internal_test: file.write_all()").as_bytes()
-        );
+        ).unwrap();
 
 }

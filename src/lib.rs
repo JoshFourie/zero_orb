@@ -4,6 +4,7 @@ pub mod code;
 pub mod knowledge;
 pub mod common;
 pub mod interface;
+pub mod crypto;
 
 pub use zksnark::{
     *, 
@@ -22,8 +23,7 @@ pub use crate::{
     },
     interface::{
         Andromeda,
-        InterOperable,
-        Transportable
+        GoZero,
     },
     common::{
         CommonReference, 
