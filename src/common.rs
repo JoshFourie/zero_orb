@@ -32,7 +32,6 @@ pub struct CommonReference<T, U, V> {
 
 // TODO: impl clone trait for RefFinder.
 // a struct for holding the relevant ref_str for the CommonReference struct.
-#[derive(Serialize, Deserialize)]
 pub struct RefFinder {
     pub code: String,
     pub qap: String,
