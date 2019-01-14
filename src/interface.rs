@@ -223,19 +223,48 @@ mod test {
         let crs: CommonReference<FrLocal, G1Local, G2Local> = CommonReference::read(
             &read_to_string("src/tests/files/crs/sample.crs").unwrap()
         );
-        let weights = Knowledge::into(
-            None, 
-            None,
-            Some(vec![20, 5]),
-            None,
-            None,
-        );
+        let weights = |a, b: usize| -> Knowledge {
+            Knowledge::into(
+                None, 
+                None,
+                Some(vec![a, b]),
+                None,
+                None,
+            )
+        };
         assert_eq!(
             true,
             Andromeda::into(
                 crs.clone(), 
-                weights, 
+                weights(20, 5), 
                 Some(vec![100]),
+                EdDSA::<String>::init_key_pair()
+            ).go().verify()
+        );
+        assert_eq!(
+            false,
+            Andromeda::into(
+                crs.clone(), 
+                weights(10, 5), 
+                Some(vec![100]),
+                EdDSA::<String>::init_key_pair()
+            ).go().verify()
+        );
+        assert_eq!(
+            false,
+            Andromeda::into(
+                crs.clone(), 
+                weights(10, 2), 
+                Some(vec![100]),
+                EdDSA::<String>::init_key_pair()
+            ).go().verify()
+        );
+        assert_eq!(
+            false,
+            Andromeda::into(
+                crs.clone(), 
+                weights(20, 5), 
+                Some(vec![90]),
                 EdDSA::<String>::init_key_pair()
             ).go().verify()
         );
