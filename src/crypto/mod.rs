@@ -15,7 +15,7 @@ pub trait SignatureScheme {
     type PublicKey;
 
     fn sign_message(&self, key: &Self::KeyPair) -> Self::Signature;
-    fn verify_signature(&self, sig: &Vec<u8>, key: &Self::PublicKey) -> bool;
+    fn verify_signature(&self, sig: &Self::Signature, key: &Self::PublicKey) -> bool;
     fn public_key(key: &Self::KeyPair) -> Self::PublicKey;
     fn init_key_pair() -> Self::KeyPair;
 }
@@ -35,14 +35,20 @@ impl<T> SignatureScheme for EdDSA<T>
 where
     T: AsRef<[u8]>
 {
-    type Signature = signature::Signature;
-    type KeyPair = signature::Ed25519KeyPair;
-    type PublicKey = Vec<u8>;
+    type Signature = Box<[u8]>;
+    type KeyPair = Box<[u8]>;
+    type PublicKey = Box<[u8]>;
 
     fn sign_message(&self, key: &Self::KeyPair) -> Self::Signature {
-        key.sign(&self.0.as_ref())
+        Ed25519KeyPair::from_pkcs8(
+            untrusted::Input::from(&key)
+        ).expect("EdDSA::SignatureScheme::sign_message()::from_pkcs8() panicked")
+            .sign(&self.0.as_ref())
+            .as_ref()
+            .to_vec()
+            .into_boxed_slice()
     }
-    fn verify_signature(&self, sig: &Vec<u8>, key: &Self::PublicKey) -> bool {
+    fn verify_signature(&self, sig: &Self::Signature, key: &Self::PublicKey) -> bool {
         match signature::verify(
             &signature::ED25519, 
             untrusted::Input::from(
@@ -60,19 +66,20 @@ where
         }
     }
     fn public_key(key: &Self::KeyPair) -> Self::PublicKey {
-        key.public_key()
+        Ed25519KeyPair::from_pkcs8(
+            untrusted::Input::from(&key)
+        ).expect("EdDSA::SignatureScheme::sign_message()::from_pkcs8() panicked")
+            .public_key()
             .as_ref()
             .to_vec()
+            .into_boxed_slice()
     }
     fn init_key_pair() -> Self::KeyPair {
-        Ed25519KeyPair::from_pkcs8(
-            untrusted::Input::from(
-                Ed25519KeyPair::generate_pkcs8(&rand::SystemRandom::new())
-                    .expect("String::CryoKey::init_key_pair() panicked at the associated function: generate_pkcs8()")
-                .as_ref()
-            )
-        )
-        .expect("String::CryoKey::init_key_pair() panicked at the associated function: from_pkcs8")
+        Ed25519KeyPair::generate_pkcs8(&rand::SystemRandom::new())
+            .expect("String::CryoKey::init_key_pair() panicked at the associated function: generate_pkcs8()")
+            .as_ref()
+            .to_vec()
+            .into_boxed_slice()
     }    
 }
 
@@ -87,9 +94,7 @@ mod tests {
             .sign_message(&kp);
         assert!(EdDSA::into("testing_cryo_key")
             .verify_signature(
-                &sig
-                    .as_ref()
-                    .to_vec(),
+                &sig,
                 &EdDSA::<String>::public_key(&kp),
             )
         );
