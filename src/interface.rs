@@ -44,7 +44,6 @@ pub struct Andromeda<A, B, T, U, V, W> {
 pub struct BackPack<A, T, U, V, W> {
     prf: Proof<U, V>,
     ver: Option<Vec<usize>>,
-    tag: String,
     sig: Box<[u8]>,
     puk: Box<[u8]>,    
     crs: A,
@@ -76,7 +75,6 @@ impl<A, T, U, V, W> BackPack<A, T, U, V, W> {
     pub fn into(
         prf: Proof<U, V>,
         ver: Option<Vec<usize>>,
-        tag: String,
         sig: Box<[u8]>,
         puk: Box<[u8]>,    
         crs: A,
@@ -84,7 +82,6 @@ impl<A, T, U, V, W> BackPack<A, T, U, V, W> {
         BackPack {
             prf: prf,
             ver: ver,
-            tag: tag,
             sig: sig,
             puk: puk,    
             crs: crs,
@@ -133,7 +130,6 @@ where
         BackPack::into(
             prf,
             self.compute_out,
-            "tag_blank".to_string(),
             sig,
             EdDSA::<String>::public_key(&self.key_pair)
                 .as_ref()
