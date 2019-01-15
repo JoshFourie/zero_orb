@@ -52,6 +52,26 @@ pub struct BackPack<A, T, U, V, W> {
     _phantom_gt: PhantomData<W>,
 }
 
+impl<A, B, T, U, V, W> Andromeda<A, B, T, U, V, W> {
+    pub fn into(
+        crs: A, 
+        weights: B, 
+        compute_out: Option<Vec<usize>>,
+        key_pair: Box<[u8]>,
+    ) -> Andromeda<A, B, T, U, V, W> {
+        Self {
+            crs: crs,
+            weights: weights,
+            key_pair: key_pair,
+            compute_out: compute_out,
+            _phantom_fr: PhantomData::<T>,
+            _phantom_g1: PhantomData::<U>,
+            _phantom_g2: PhantomData::<V>,
+            _phantom_gt: PhantomData::<W>, 
+        }
+    }
+}
+
 impl<A, T, U, V, W> BackPack<A, T, U, V, W> {
     pub fn into(
         prf: Proof<U, V>,
@@ -70,26 +90,6 @@ impl<A, T, U, V, W> BackPack<A, T, U, V, W> {
             crs: crs,
             _phantom_fr: PhantomData::<T>,
             _phantom_gt: PhantomData::<W>,
-        }
-    }
-}
-
-impl<A, B, T, U, V, W> Andromeda<A, B, T, U, V, W> {
-    pub fn into(
-        crs: A, 
-        weights: B, 
-        compute_out: Option<Vec<usize>>,
-        key_pair: Box<[u8]>,
-    ) -> Andromeda<A, B, T, U, V, W> {
-        Self {
-            crs: crs,
-            weights: weights,
-            key_pair: key_pair,
-            compute_out: compute_out,
-            _phantom_fr: PhantomData::<T>,
-            _phantom_g1: PhantomData::<U>,
-            _phantom_g2: PhantomData::<V>,
-            _phantom_gt: PhantomData::<W>, 
         }
     }
 }
@@ -125,10 +125,9 @@ where
     type Returner = BackPack<A, T, U, V, W>;
 
     fn go(self) -> Self::Returner {
-        use serde_json::to_string;
         let prf = self.weights.new(self.crs.clone());
         let sig = EdDSA::into(
-            to_string(&prf)
+            serde_json::to_string(&prf)
             .expect("Andromemda::GoZero::go() failed to parse &prf as a string for the EdDSA tuple-struct")   
         ).sign_message(&self.key_pair);
         BackPack::into(

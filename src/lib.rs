@@ -12,7 +12,8 @@ pub use zksnark::{
         fr::{
             FrLocal, 
             G1Local, 
-            G2Local
+            G2Local,
+            GtLocal,
         },
     },
 };
