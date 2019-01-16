@@ -122,6 +122,11 @@ impl Knowledge {
             ut: ut,
         }
     }
+    pub fn into_num_only(wn: Option<Vec<usize>>, vn: Option<Vec<usize>>) -> Self {
+        Self::into(
+            None, None, wn, vn, None
+        )
+    }
 }
 
 pub struct Marker {

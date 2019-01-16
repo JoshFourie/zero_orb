@@ -30,15 +30,6 @@ pub struct CommonReference<T, U, V> {
     pub sg2: SigmaG2<V>,
 }
 
-// TODO: impl clone trait for RefFinder.
-// a struct for holding the relevant ref_str for the CommonReference struct.
-pub struct RefFinder {
-    pub code: String,
-    pub qap: String,
-    pub sg1: String,
-    pub sg2: String,
-}
-
 pub trait Common<T, U, V>: Clone {
     fn new(code: String) -> Self;
     fn read(s: &String) -> Self;
@@ -135,16 +126,16 @@ where
 
     // improve for error handling/checking file integrity.
     // writes the CommonReference struct to the files given in the Pathfinder.
-    pub fn write(&self, ref_str: RefFinder) {
-        let _qap_file = File::create(ref_str.qap).expect("CommonReference::write() creating File for QAP from P")
+    pub fn write(&self, qap: String, sg1: String, sg2: String) {
+        let _qap_file = File::create(qap).expect("CommonReference::write() creating File for QAP from P")
             .write_all(
                 to_string(&self.qap).expect("CommonReference::write() parsing QAP as string for writing").as_bytes()
             );
-        let _sg1_file = File::create(ref_str.sg1).expect("CommonReference::write() creating File for SigmaG1")
+        let _sg1_file = File::create(sg1).expect("CommonReference::write() creating File for SigmaG1")
             .write_all(
                 to_string(&self.sg1).expect("CommonReference::write() parsing SigmaG1 as string for writing").as_bytes()
             );
-        let _sg2_file = File::create(ref_str.sg2).expect("CommonReference::write() creating File for SigmaG2")
+        let _sg2_file = File::create(sg2).expect("CommonReference::write() creating File for SigmaG2")
             .write_all(
                 to_string(&self.sg2).expect("CommonReference::write() parsing SigmaG2 as string for writing").as_bytes()
             );
