@@ -25,7 +25,7 @@ pub trait GoZero<'de> {
     fn go(self) -> Self::Returner;
 }
 
-trait ZeroRef {
+pub trait ZeroRef {
     type C;
     fn copy_str(&self) -> Self::C;
 }
