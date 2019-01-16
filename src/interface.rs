@@ -25,6 +25,11 @@ pub trait GoZero<'de> {
     fn go(self) -> Self::Returner;
 }
 
+trait ZeroRef {
+    type C;
+    fn copy_str(&self) -> Self::C;
+}
+
 pub trait MarkZero {   
     fn verify(self) -> bool;
 }
@@ -190,6 +195,30 @@ where
             (true, true) => true,
             (_, _) => false
         }
+    }
+}
+
+impl<A, T, U, V, W> ZeroRef for BackPack<A, T, U, V, W>
+where
+    A: Serialize,
+    U: Serialize, 
+    V: Serialize,
+{
+    type C = (String, String, String, String, String);
+    
+    fn copy_str(&self) -> Self::C {
+        return(
+            serde_json::to_string(&self.prf)
+                .expect("BackPack::ZeroRef::copy::to_string::prf panicked whilst deserializing field prf for BackPack"),
+            serde_json::to_string(&self.ver)
+                .expect("BackPack::ZeroRef::copy::to_string::ver panicked whilst deserializing field ver for BackPack"),
+            serde_json::to_string(&self.sig)
+                .expect("BackPack::ZeroRef::copy::to_string::sig panicked whilst deserializing field sig for BackPack"),
+            serde_json::to_string(&self.puk)
+                .expect("BackPack::ZeroRef::copy::to_string::puk panicked whilst deserializing field puk for BackPack"),
+            serde_json::to_string(&self.crs)
+                .expect("BackPack::ZeroRef::copy::to_string::prf panicked whilst deserializing field crs for BackPack"),
+        )
     }
 }
 
