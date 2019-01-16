@@ -42,11 +42,11 @@ pub struct Andromeda<A, B, T, U, V, W> {
 
 #[derive(Serialize, Deserialize)]
 pub struct BackPack<A, T, U, V, W> {
-    prf: Proof<U, V>,
-    ver: Option<Vec<usize>>,
-    sig: Box<[u8]>,
-    puk: Box<[u8]>,    
-    crs: A,
+    pub prf: Proof<U, V>,
+    pub ver: Option<Vec<usize>>,
+    pub sig: Box<[u8]>,
+    pub puk: Box<[u8]>,    
+    pub crs: A,
     _phantom_fr: PhantomData<T>,
     _phantom_gt: PhantomData<W>,
 }
