@@ -1,0 +1,7 @@
+(in a b neg)
+(out y)
+(verify y)
+
+(program
+(= y_1 (* neg a b))
+(= y (* 1 (+ y_1 a b)))

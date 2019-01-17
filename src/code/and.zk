@@ -1,0 +1,9 @@
+(in a b c d e f g h)
+(out w x y z)
+(verify w x y z)
+
+(program
+(= w (* a e))
+(= x (* b f))
+(= y (* c g))
+(= z (* d h))
