@@ -28,6 +28,11 @@ pub trait GoZero<'de> {
 pub trait ZeroRef {
     type C;
     fn copy_str(&self) -> Self::C;
+    fn get_prf_str(&self) -> String;
+    fn get_ver_str(&self) -> String;
+    fn get_sig_str(&self) -> String;
+    fn get_puk_str(&self) -> String;
+    fn get_crs_str(&self) -> String;
 }
 
 pub trait MarkZero {   
@@ -217,8 +222,23 @@ where
             serde_json::to_string(&self.puk)
                 .expect("BackPack::ZeroRef::copy::to_string::puk panicked whilst deserializing field puk for BackPack"),
             serde_json::to_string(&self.crs)
-                .expect("BackPack::ZeroRef::copy::to_string::prf panicked whilst deserializing field crs for BackPack"),
+                .expect("BackPack::ZeroRef::copy::to_string::crs panicked whilst deserializing field crs for BackPack"),
         )
+    }
+    fn get_prf_str(&self) -> String {
+        serde_json::to_string(&self.prf).expect("BackPack::ZeroRef::get_prf_str::to_string::prf panicked whilst deserializing field prf for BackPack")
+    }
+    fn get_ver_str(&self) -> String {
+        serde_json::to_string(&self.ver).expect("BackPack::ZeroRef::get_ver_str::to_string::ver panicked whilst deserializing field ver for BackPack")
+    }
+    fn get_sig_str(&self) -> String {
+        serde_json::to_string(&self.sig).expect("BackPack::ZeroRef::get_sig_str::to_string::sig panicked whilst deserializing field sig for BackPack")
+    }
+    fn get_puk_str(&self) -> String {
+        serde_json::to_string(&self.puk).expect("BackPack::ZeroRef::get_puk_str::to_string::puk panicked whilst deserializing field puk for BackPack")
+    }
+    fn get_crs_str(&self) -> String {
+        serde_json::to_string(&self.crs).expect("BackPack::ZeroRef::get_crs_str::to_string::crs panicked whilst deserializing field crs for BackPack")
     }
 }
 
